@@ -4,9 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { auth, db } from "../../lib/firebase";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, collection, addDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
-import { useAuth } from "../../context/AuthContext";
 
 export default function RegisterPage() {
     const router = useRouter();
@@ -38,11 +37,27 @@ export default function RegisterPage() {
             // 表示名（name）を設定
             await updateProfile(userCredential.user, { displayName: name });
 
-            // Firestore にユーザーデータを保存
+            // 1. home を作成
+            const homeRef = await addDoc(collection(db, "homes"), {
+                ownerId: userCredential.user.uid,
+                createdAt: new Date(),
+            });
+
+            // homeId を取得
+            const homeId = homeRef.id;
+
+            // 2. homes/{homeId}/members/{uid} を作成
+            await setDoc(doc(db, "homes", homeId, "members", userCredential.user.uid), {
+                role: "owner",
+                joinedAt: new Date(),
+            });
+
+            // 3. Firestore にユーザー情報を保存
             await setDoc(doc(db, "users", userCredential.user.uid), {
                 uid: userCredential.user.uid,
                 name,
                 email,
+                homeId,
                 createdAt: new Date(),
             });
 

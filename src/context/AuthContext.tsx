@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, User, signOut, browserLocalPersistence, browserSessionPersistence, setPersistence } from "firebase/auth";
 import { auth } from "../lib/firebase";
+import { setupAuthCookieListener } from "../lib/authCookies";
 
 interface AuthContextType {
     user: User | null;
@@ -32,6 +33,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const logout = async () => {
         await signOut(auth);
     };
+
+    useEffect(() => {
+        setupAuthCookieListener();
+    }, []);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (currentUser: User | null) => {
