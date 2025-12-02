@@ -1,13 +1,22 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { onAuthStateChanged, User, signOut, browserLocalPersistence, browserSessionPersistence, setPersistence } from "firebase/auth";
-import { auth } from "../lib/firebase";
+import {
+    onAuthStateChanged,
+    User,
+    signOut,
+    browserLocalPersistence,
+    browserSessionPersistence,
+    setPersistence,
+} from "firebase/auth";
+import { auth, db } from "../lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 import { setupAuthCookieListener } from "../lib/authCookies";
 
 interface AuthContextType {
     user: User | null;
     loading: boolean;
+    homeId: string | null;  // ★ homeId を追加
     logout: () => Promise<void>;
     setRemember: (remember: boolean) => Promise<void>;
 }
@@ -15,6 +24,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
     user: null,
     loading: true,
+    homeId: null,
     logout: async () => { },
     setRemember: async () => { },
 });
@@ -23,9 +33,10 @@ export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
+    const [homeId, setHomeId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
-    // 永続化設定（rememberMe が設定された後に呼ばれる）
+    // 永続化設定
     const setRemember = async (remember: boolean) => {
         await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
     };
@@ -34,13 +45,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         await signOut(auth);
     };
 
+    // Firebase ID token → Cookie セット
     useEffect(() => {
         setupAuthCookieListener();
     }, []);
 
+    // ログイン状態と homeId を監視
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (currentUser: User | null) => {
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser: User | null) => {
             setUser(currentUser);
+
+            if (currentUser) {
+                // Firestore から homeId を取得
+                const snap = await getDoc(doc(db, "users", currentUser.uid));
+                if (snap.exists()) {
+                    const data = snap.data();
+                    setHomeId(data.homeId ?? null);
+                }
+            } else {
+                setHomeId(null);
+            }
+
             setLoading(false);
         });
 
@@ -48,7 +73,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }, []);
 
     return (
-        <AuthContext.Provider value={{ user, loading, logout, setRemember }}>
+        <AuthContext.Provider value={{ user, loading, homeId, logout, setRemember }}>
             {children}
         </AuthContext.Provider>
     );
