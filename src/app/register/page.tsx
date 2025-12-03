@@ -61,8 +61,8 @@ export default function RegisterPage() {
                 createdAt: new Date(),
             });
 
-            // 登録完了 → ログインページへ
-            router.push("/login");
+            // 登録完了 → トップページへ
+            router.push("/");
         } catch (err: any) {
             console.error(err);
             setError("登録に失敗しました：" + err.message);
