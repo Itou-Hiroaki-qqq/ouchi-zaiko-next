@@ -1,19 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useGenres } from "../../hooks/useGenres";
 import { db } from "../../lib/firebase";
 import { collection, addDoc, deleteDoc, doc, serverTimestamp } from "firebase/firestore";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 export default function GenresPage() {
     const { homeId } = useAuth();
     const { genres, loading } = useGenres(homeId);
     const [newGenre, setNewGenre] = useState("");
     const [message, setMessage] = useState("");
+    const searchParams = useSearchParams();
 
     if (!homeId) return <div className="p-4">読み込み中...</div>;
+
+    // 編集から戻ってきたらメッセージを表示
+    useEffect(() => {
+        if (searchParams.get("updated") === "1") {
+            setMessage("ジャンルを更新しました。");
+            setTimeout(() => setMessage(""), 5000);
+        }
+    }, [searchParams]);
 
     const handleAdd = async () => {
         if (!newGenre.trim()) return;
@@ -73,18 +83,18 @@ export default function GenresPage() {
                             key={genre.id}
                             className="card bg-base-100 shadow p-3 flex justify-between items-center"
                         >
-                            <span>{genre.name}</span>
+                            <span>ジャンル名：{genre.name}</span>
 
-                            <div className="flex gap-3">
+                            <div className="flex gap-3 mt-2.5">
                                 <Link
                                     href={`/genres/${genre.id}/edit`}
-                                    className="btn btn-sm btn-secondary"
+                                    className="btn btn-sm btn-neutral"
                                 >
                                     編集
                                 </Link>
 
                                 <button
-                                    className="btn btn-sm btn-error"
+                                    className="btn btn-sm btn-outline btn-error"
                                     onClick={() => handleDelete(genre.id)}
                                 >
                                     削除
