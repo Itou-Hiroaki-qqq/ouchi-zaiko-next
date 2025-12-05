@@ -126,24 +126,26 @@ export default function HomePage() {
     return <div className="p-4">データを準備中...</div>;
   }
 
-  // ジャンルロード中 or activeGenreId 未設定
-  if (genreLoading || !activeGenreId) {
+  // ジャンルロード中
+  if (genreLoading) {
     return <div className="p-4">読み込み中...</div>;
   }
 
-  // ----------------------------
-  // ▼ ジャンルがない
-  // ----------------------------
+  // ▼ ジャンルがない（最優先で表示！）
   if (genres.length === 0) {
     return (
       <div className="p-4">
         <h1 className="text-xl font-bold mb-4">在庫リスト</h1>
-        <p>
-          ジャンルが登録されていません。まずは「ジャンル設定」からジャンルを追加してください。
-        </p>
+        <p>ジャンルが登録されていません。まずは「ジャンル設定」からジャンルを追加してください。</p>
       </div>
     );
   }
+
+  // ▼ activeGenreId が未設定 → 最初の genre をセット（UI 表示はその次の render で行う）
+  if (!activeGenreId) {
+    return <div className="p-4">読み込み中...</div>;
+  }
+
 
   // ----------------------------
   // ▼ 通常画面

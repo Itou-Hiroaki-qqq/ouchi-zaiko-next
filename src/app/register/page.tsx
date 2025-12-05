@@ -4,13 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { auth, db } from "../../lib/firebase";
-import { doc, setDoc, collection, addDoc } from "firebase/firestore";
+import { doc, setDoc, collection, addDoc, getDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 
 export default function RegisterPage() {
     const router = useRouter();
 
-    // フォーム入力状態
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -31,45 +30,73 @@ export default function RegisterPage() {
         }
 
         try {
-            // Firebase Auth アカウント作成
-            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            // ============================
+            // ① Auth ユーザー作成
+            // ============================
+            const userCredential = await createUserWithEmailAndPassword(
+                auth,
+                email,
+                password
+            );
 
-            // ユーザー表示名を設定
+            const uid = userCredential.user.uid;
+
+            // 表示名セット
             await updateProfile(userCredential.user, { displayName: name });
 
-            // Firestore: home 作成
+            // ============================
+            // ② homes の作成
+            // ============================
             const homeRef = await addDoc(collection(db, "homes"), {
-                ownerId: userCredential.user.uid,
+                ownerId: uid,
                 createdAt: new Date(),
             });
 
             const homeId = homeRef.id;
 
-            // Firestore: homes/{homeId}/members/{uid}
-            await setDoc(doc(db, "homes", homeId, "members", userCredential.user.uid), {
+            // ownerId が確実に書き込まれているかチェック（Firestore の反映遅延対策）
+            const homeSnap = await getDoc(homeRef);
+            if (!homeSnap.exists()) {
+                throw new Error("home の作成確認に失敗しました");
+            }
+
+            // ============================
+            // ③ members 追加（オーナー）
+            // ============================
+            await setDoc(doc(db, "homes", homeId, "members", uid), {
                 role: "owner",
                 joinedAt: new Date(),
             });
 
-            // Firestore: users/{uid}
-            await setDoc(doc(db, "users", userCredential.user.uid), {
-                uid: userCredential.user.uid,
+            // ============================
+            // ④ users にユーザー情報を作成
+            // ============================
+            await setDoc(doc(db, "users", uid), {
+                uid,
                 name,
                 email,
                 homeId,
                 createdAt: new Date(),
             });
 
-            // AuthContext へ正しく反映させるための処理
+            // ============================
+            // ⑤ AuthContext へ反映待ち
+            // ============================
             await auth.updateCurrentUser(userCredential.user);
             await new Promise((resolve) => setTimeout(resolve, 300));
 
-            // トップページへ移動
             router.push("/");
 
         } catch (err: any) {
             console.error(err);
-            setError("登録に失敗しました：" + err.message);
+
+            // FirebaseError のメッセージは長すぎるので一部だけ抽出
+            const msg =
+                typeof err?.message === "string"
+                    ? err.message.replace("Firebase:", "").trim()
+                    : "不明なエラー";
+
+            setError("登録に失敗しました：" + msg);
         }
     };
 
@@ -113,7 +140,7 @@ export default function RegisterPage() {
                     />
                 </label>
 
-                {/* Confirm Password */}
+                {/* Confirm */}
                 <label className="form-control w-full mb-3">
                     <span className="label-text">Confirm Password</span>
                     <input

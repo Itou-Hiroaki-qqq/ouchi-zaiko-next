@@ -66,22 +66,35 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 return;
             }
 
-            // Firestore 読み込みを待つ
+            // ← ここでは loading を false にせず、Firestore 読み込みを待つ
             try {
-                const snap = await getDoc(doc(db, "users", currentUser.uid));
-                if (snap.exists()) {
-                    setHomeId(snap.data().homeId ?? null);
+                let userData = null;
+
+                // Firestore の /users/{uid} が作成されるまで少し待機
+                for (let i = 0; i < 5; i++) {   // 最大5回リトライ（500ms）
+                    const snap = await getDoc(doc(db, "users", currentUser.uid));
+                    if (snap.exists()) {
+                        userData = snap.data();
+                        break;
+                    }
+                    await new Promise((res) => setTimeout(res, 100)); // 100ms待つ
+                }
+
+                if (userData) {
+                    setHomeId(userData.homeId ?? null);
                 } else {
+                    console.warn("Firestore の users ドキュメントがまだ取得できませんでした");
                     setHomeId(null);
                 }
+
             } finally {
-                // ← Firestore 読み込み後に loading を解除
-                setLoading(false);
+                setLoading(false);  // ← homeId をセットした後に初めて loading を解除！
             }
         });
 
         return () => unsubscribe();
     }, []);
+
 
     return (
         <AuthContext.Provider
