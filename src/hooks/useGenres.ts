@@ -10,7 +10,14 @@ export const useGenres = (homeId: string | null) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!homeId) return;
+        // homeId が無い場合は即リセットして終了
+        if (!homeId) {
+            setGenres([]);
+            setLoading(false);
+            return;
+        }
+
+        setLoading(true);
 
         const q = query(
             collection(db, "homes", homeId, "genres"),
@@ -32,3 +39,4 @@ export const useGenres = (homeId: string | null) => {
 
     return { genres, loading };
 };
+

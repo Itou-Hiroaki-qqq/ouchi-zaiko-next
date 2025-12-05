@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
 export default function RegisterPage() {
     const router = useRouter();
 
-    // フォームの状態
+    // フォーム入力状態
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -31,28 +31,27 @@ export default function RegisterPage() {
         }
 
         try {
-            // Firebase Auth の登録
+            // Firebase Auth アカウント作成
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
 
-            // 表示名（name）を設定
+            // ユーザー表示名を設定
             await updateProfile(userCredential.user, { displayName: name });
 
-            // 1. home を作成
+            // Firestore: home 作成
             const homeRef = await addDoc(collection(db, "homes"), {
                 ownerId: userCredential.user.uid,
                 createdAt: new Date(),
             });
 
-            // homeId を取得
             const homeId = homeRef.id;
 
-            // 2. homes/{homeId}/members/{uid} を作成
+            // Firestore: homes/{homeId}/members/{uid}
             await setDoc(doc(db, "homes", homeId, "members", userCredential.user.uid), {
                 role: "owner",
                 joinedAt: new Date(),
             });
 
-            // 3. Firestore にユーザー情報を保存
+            // Firestore: users/{uid}
             await setDoc(doc(db, "users", userCredential.user.uid), {
                 uid: userCredential.user.uid,
                 name,
@@ -61,8 +60,13 @@ export default function RegisterPage() {
                 createdAt: new Date(),
             });
 
-            // 登録完了 → トップページへ
+            // AuthContext へ正しく反映させるための処理
+            await auth.updateCurrentUser(userCredential.user);
+            await new Promise((resolve) => setTimeout(resolve, 300));
+
+            // トップページへ移動
             router.push("/");
+
         } catch (err: any) {
             console.error(err);
             setError("登録に失敗しました：" + err.message);
@@ -76,6 +80,7 @@ export default function RegisterPage() {
 
                 {error && <p className="text-red-500 mb-3">{error}</p>}
 
+                {/* Name */}
                 <label className="form-control w-full mb-3">
                     <span className="label-text">Name</span>
                     <input
@@ -86,6 +91,7 @@ export default function RegisterPage() {
                     />
                 </label>
 
+                {/* Email */}
                 <label className="form-control w-full mb-3">
                     <span className="label-text">Email</span>
                     <input
@@ -96,6 +102,7 @@ export default function RegisterPage() {
                     />
                 </label>
 
+                {/* Password */}
                 <label className="form-control w-full mb-3">
                     <span className="label-text">Password</span>
                     <input
@@ -106,6 +113,7 @@ export default function RegisterPage() {
                     />
                 </label>
 
+                {/* Confirm Password */}
                 <label className="form-control w-full mb-3">
                     <span className="label-text">Confirm Password</span>
                     <input

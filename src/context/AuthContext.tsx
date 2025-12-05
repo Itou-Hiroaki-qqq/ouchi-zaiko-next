@@ -1,6 +1,11 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+    createContext,
+    useContext,
+    useEffect,
+    useState,
+} from "react";
 import {
     onAuthStateChanged,
     User,
@@ -16,7 +21,7 @@ import { setupAuthCookieListener } from "../lib/authCookies";
 interface AuthContextType {
     user: User | null;
     loading: boolean;
-    homeId: string | null;  // ★ homeId を追加
+    homeId: string | null;
     logout: () => Promise<void>;
     setRemember: (remember: boolean) => Promise<void>;
 }
@@ -36,44 +41,52 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [homeId, setHomeId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
-    // 永続化設定
     const setRemember = async (remember: boolean) => {
-        await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
+        await setPersistence(
+            auth,
+            remember ? browserLocalPersistence : browserSessionPersistence
+        );
     };
 
     const logout = async () => {
         await signOut(auth);
     };
 
-    // Firebase ID token → Cookie セット
     useEffect(() => {
         setupAuthCookieListener();
     }, []);
 
-    // ログイン状態と homeId を監視
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser: User | null) => {
+        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             setUser(currentUser);
 
-            if (currentUser) {
-                // Firestore から homeId を取得
-                const snap = await getDoc(doc(db, "users", currentUser.uid));
-                if (snap.exists()) {
-                    const data = snap.data();
-                    setHomeId(data.homeId ?? null);
-                }
-            } else {
+            if (!currentUser) {
                 setHomeId(null);
+                setLoading(false);
+                return;
             }
 
-            setLoading(false);
+            // Firestore 読み込みを待つ
+            try {
+                const snap = await getDoc(doc(db, "users", currentUser.uid));
+                if (snap.exists()) {
+                    setHomeId(snap.data().homeId ?? null);
+                } else {
+                    setHomeId(null);
+                }
+            } finally {
+                // ← Firestore 読み込み後に loading を解除
+                setLoading(false);
+            }
         });
 
         return () => unsubscribe();
     }, []);
 
     return (
-        <AuthContext.Provider value={{ user, loading, homeId, logout, setRemember }}>
+        <AuthContext.Provider
+            value={{ user, loading, homeId, logout, setRemember }}
+        >
             {children}
         </AuthContext.Provider>
     );
