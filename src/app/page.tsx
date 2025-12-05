@@ -7,7 +7,12 @@ import { useItems } from "../hooks/useItems";
 import Link from "next/link";
 
 import { db } from "../lib/firebase";
-import { collection, addDoc } from "firebase/firestore";
+import {
+  collection,
+  addDoc,
+  doc,
+  updateDoc,
+} from "firebase/firestore";
 
 export default function HomePage() {
   const { homeId, loading: authLoading, user } = useAuth();
@@ -18,23 +23,33 @@ export default function HomePage() {
   const { genres, loading: genreLoading } = useGenres(homeId);
   const { items, loading: itemLoading } = useItems(homeId, activeGenreId);
 
-  // ▼ 初期ジャンル設定（Hooks の中）
+  // ----------------------------
+  // ▼ 初期ジャンル設定
+  // ----------------------------
   useEffect(() => {
     if (genres.length > 0 && !activeGenreId) {
       setActiveGenreId(genres[0].id);
     }
   }, [genres, activeGenreId]);
 
+  // ----------------------------
   // ▼ 商品追加
+  // ----------------------------
   const handleAddItem = async () => {
-    if (!newItem.trim() || !homeId || !activeGenreId) return;
+    if (!homeId || !activeGenreId) return;
+    if (!newItem.trim()) return;
 
     await addDoc(collection(db, "homes", homeId, "items"), {
       name: newItem.trim(),
       genreId: activeGenreId,
       quantity: 0,
-      purchaseCount: 0,
+      // 備考メモ
       memo: "",
+      note: "",
+      // 次回購入リスト用
+      purchaseCount: 0,
+      totalPurchased: 0,
+      // 並び順（とりあえず末尾に追加）
       order: items.length,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -44,40 +59,94 @@ export default function HomePage() {
   };
 
   // ----------------------------
-  // ▼ UI 分岐（Hooks の後に 1 回だけ）
+  // ▼ 数量更新（共通処理）
+  // ----------------------------
+  const updateQuantity = async (itemId: string, newQty: number) => {
+    if (!homeId) return;
+
+    const safeQty = newQty < 0 ? 0 : newQty;
+
+    await updateDoc(doc(db, "homes", homeId, "items", itemId), {
+      quantity: safeQty,
+      updatedAt: new Date(),
+    });
+  };
+
+  const handleIncrease = (itemId: string, currentQty: number) => {
+    updateQuantity(itemId, (currentQty ?? 0) + 1);
+  };
+
+  const handleDecrease = (itemId: string, currentQty: number) => {
+    if ((currentQty ?? 0) <= 0) return;
+    updateQuantity(itemId, (currentQty ?? 0) - 1);
+  };
+
+  const handleQuantityInputChange = (
+    itemId: string,
+    value: string
+  ) => {
+    const num = Number(value);
+    if (Number.isNaN(num)) return;
+    if (num < 0) return;
+    updateQuantity(itemId, num);
+  };
+
+  // ----------------------------
+  // ▼ 次回購入リストに追加
+  // ----------------------------
+  const handleAddToNext = async (itemId: string, currentCount?: number) => {
+    if (!homeId) return;
+
+    const nextCount = currentCount && currentCount > 0 ? currentCount : 1;
+
+    await updateDoc(doc(db, "homes", homeId, "items", itemId), {
+      purchaseCount: nextCount,
+      updatedAt: new Date(),
+    });
+
+    alert("次回購入リストに追加しました");
+  };
+
+  // ----------------------------
+  // ▼ UI 分岐（Hooks の後！）
   // ----------------------------
 
+  // Auth 読み込み中
   if (authLoading) {
     return <div className="p-4">読み込み中...</div>;
   }
 
+  // 未ログイン
   if (!user) {
     return <div className="p-4">ログインが必要です。</div>;
   }
 
+  // homeId がロードされていない（新規登録直後など）
   if (!homeId) {
     return <div className="p-4">データを準備中...</div>;
   }
 
-  if (genreLoading) {
-    return <div className="p-4">ジャンルを読み込み中...</div>;
+  // ジャンルロード中 or activeGenreId 未設定
+  if (genreLoading || !activeGenreId) {
+    return <div className="p-4">読み込み中...</div>;
   }
 
+  // ----------------------------
+  // ▼ ジャンルがない
+  // ----------------------------
   if (genres.length === 0) {
     return (
       <div className="p-4">
         <h1 className="text-xl font-bold mb-4">在庫リスト</h1>
-        <p>ジャンルが登録されていません。「ジャンル設定」から作成してください。</p>
+        <p>
+          ジャンルが登録されていません。まずは「ジャンル設定」からジャンルを追加してください。
+        </p>
       </div>
     );
   }
 
-  if (!activeGenreId) {
-    return <div className="p-4">ジャンルを準備中...</div>;
-  }
-
   // ----------------------------
-  // ▼ 通常画面（ここだけが最終的な画面）
+  // ▼ 通常画面
   // ----------------------------
   return (
     <div className="p-4">
@@ -118,30 +187,78 @@ export default function HomePage() {
         <p>登録されている商品はありません。</p>
       ) : (
         <div className="space-y-3">
-          {items.map((item) => (
-            <div
-              key={item.id}
-              className="card bg-base-100 shadow p-4 flex flex-row justify-between items-center"
-            >
-              <button className="btn btn-sm btn-accent" disabled>
-                次回購入
-              </button>
+          {items.map((item) => {
+            const qty = item.quantity ?? 0;
+            const isZero = qty === 0;
 
-              <Link href={`/items/${item.id}`} className="flex-1 mx-4">
-                {item.name}
-              </Link>
+            return (
+              <div
+                key={item.id}
+                className={
+                  "card shadow p-4 flex flex-row justify-between items-center " +
+                  (isZero
+                    ? "bg-base-200 text-gray-400"
+                    : "bg-base-100")
+                }
+              >
+                {/* 次回購入ボタン */}
+                <button
+                  className="btn btn-sm btn-accent"
+                  onClick={() =>
+                    handleAddToNext(item.id, item.purchaseCount)
+                  }
+                >
+                  次回購入
+                </button>
 
-              <div className="flex items-center gap-2">
-                <button className="btn btn-sm" disabled>
-                  -
-                </button>
-                <span className="w-8 text-center">{item.quantity}</span>
-                <button className="btn btn-sm" disabled>
-                  +
-                </button>
+                {/* 商品名（商品設定ページへ） */}
+                <Link
+                  href={`/items/${item.id}`}
+                  className={
+                    `flex-1 mx-4 underline-offset-2 
+                    ${isZero
+                      ? "text-gray-400 hover:text-gray-600 hover:underline"
+                      : "hover:underline"}`
+                  }
+                >
+                  {item.name}
+                </Link>
+
+                {/* 数量（＋／− と直接入力） */}
+                <div className="flex items-center gap-2">
+                  <button
+                    className="btn btn-sm"
+                    onClick={() => handleDecrease(item.id, qty)}
+                  >
+                    -
+                  </button>
+
+                  <input
+                    type="number"
+                    min={0}
+                    className={
+                      "input input-bordered w-16 text-center " +
+                      (isZero ? "text-gray-400" : "")
+                    }
+                    value={qty}
+                    onChange={(e) =>
+                      handleQuantityInputChange(
+                        item.id,
+                        e.target.value
+                      )
+                    }
+                  />
+
+                  <button
+                    className="btn btn-sm"
+                    onClick={() => handleIncrease(item.id, qty)}
+                  >
+                    +
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

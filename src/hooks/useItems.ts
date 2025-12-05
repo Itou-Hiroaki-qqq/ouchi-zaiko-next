@@ -10,21 +10,43 @@ export const useItems = (homeId: string | null, genreId: string | null) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!homeId || !genreId) return;
+        // 条件がそろっていない場合は即リセット
+        if (!homeId || !genreId) {
+            setItems([]);
+            setLoading(false);
+            return;
+        }
+
+        setLoading(true);
 
         const q = query(
             collection(db, "homes", homeId, "items"),
             where("genreId", "==", genreId),
-            orderBy("order", "asc")
+            orderBy("order", "asc") // Firestore側は登録順で取得
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const list = snapshot.docs.map((doc) => ({
+            // Firestore から取得
+            const rawList = snapshot.docs.map((doc) => ({
                 id: doc.id,
                 ...doc.data(),
             })) as Item[];
 
-            setItems(list);
+            // ▼ purchaseCount が存在しない場合は 0 扱い
+            const normalized = rawList.map((item) => ({
+                ...item,
+                purchaseCount: item.purchaseCount ?? 0,
+            }));
+
+            // ▼ 並び替え：purchaseCount 降順 → order 昇順
+            const sorted = normalized.sort((a, b) => {
+                if ((b.purchaseCount ?? 0) !== (a.purchaseCount ?? 0)) {
+                    return (b.purchaseCount ?? 0) - (a.purchaseCount ?? 0);
+                }
+                return a.order - b.order;
+            });
+
+            setItems(sorted);
             setLoading(false);
         });
 
