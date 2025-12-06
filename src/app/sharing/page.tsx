@@ -10,6 +10,7 @@ import {
     query,
     updateDoc,
     where,
+    setDoc, 
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 
@@ -127,13 +128,25 @@ export default function SharingPage() {
             const data = targetDoc.data() as any;
             const targetUid: string = data.uid ?? targetDoc.id;
 
+            console.log("---- sharing debug ----");
+            console.log("HomeID:", homeId);
+            console.log("Target UID:", targetUid);
+
+            // 既に共有済みか判定
             if (data.homeId === homeId) {
                 showInfo("すでにこのおうちと共有されています");
                 setInputEmail("");
                 return;
             }
 
+            // users/{uid} の homeId を更新
             await updateDoc(doc(db, "users", targetUid), { homeId });
+
+            // ★★★ members にも追加（これが UI 表示に必須）
+            await setDoc(doc(db, "homes", homeId, "members", targetUid), {
+                role: "shared",
+                joinedAt: new Date(),
+            });
 
             setInputEmail("");
             showInfo("共有ユーザーを追加しました");
@@ -142,6 +155,7 @@ export default function SharingPage() {
             showError("共有ユーザーの追加に失敗しました");
         }
     };
+
 
     // ----------------------------
     // ▼ 共有解除
