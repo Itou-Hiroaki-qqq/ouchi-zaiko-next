@@ -30,8 +30,8 @@ const AuthContext = createContext<AuthContextType>({
     user: null,
     loading: true,
     homeId: null,
-    logout: async () => { },
-    setRemember: async () => { },
+    logout: async () => {},
+    setRemember: async () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -40,6 +40,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [homeId, setHomeId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
+
+    // ▼ ログイン状態の永続化を強制的に local に設定
+    useEffect(() => {
+        setPersistence(auth, browserLocalPersistence)
+            .then(() => console.log("Persistence set to LOCAL"))
+            .catch((err) => console.error("Failed to set persistence:", err));
+    }, []);
 
     const setRemember = async (remember: boolean) => {
         await setPersistence(
@@ -58,10 +65,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-
             console.log("AuthStateChanged triggered. currentUser =", currentUser?.uid);
 
-            // ① uid が未確定のとき → Firestore に触らない（PermissionDenied防止）
             if (!currentUser?.uid) {
                 console.log("currentUser.uid が未確定のため Firestore にアクセスしません");
                 setUser(null);
@@ -70,13 +75,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 return;
             }
 
-            // user はここで初めてセット（hooks が早く動きすぎるのを防ぐ）
             setUser(currentUser);
 
             try {
                 let userData = null;
 
-                // ② /users/{uid} を最大5回リトライ（Auth と Firestore の同期遅延に対応）
+                // ▼ Firestore users/{uid} の取得リトライ（最大5回）
                 for (let i = 0; i < 5; i++) {
                     console.log(`Trying to read users/${currentUser.uid}`);
 
