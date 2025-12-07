@@ -1,20 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useGenres } from "../../hooks/useGenres";
 import { db } from "../../lib/firebase";
 import { collection, addDoc, deleteDoc, doc, serverTimestamp } from "firebase/firestore";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { AuthRequired } from "../../components/AuthRequired";
 
 export default function GenresPage() {
     const { homeId, loading: authLoading, user } = useAuth();
     const { genres, loading } = useGenres(homeId);
+
     const [newGenre, setNewGenre] = useState("");
     const [message, setMessage] = useState("");
-    const searchParams = useSearchParams();
 
     // ----------------------------
     // ▼ ローディング
@@ -24,7 +23,7 @@ export default function GenresPage() {
         return <AuthRequired />;
     }
 
-    // ★★★ 修正：共有解除後の homeId=null を正しく処理
+    // ★★★ 共有解除後の homeId=null を正しく処理
     if (!homeId) {
         return (
             <div className="p-4">
@@ -39,16 +38,6 @@ export default function GenresPage() {
             </div>
         );
     }
-
-    // ----------------------------
-    // ▼ 編集から戻ったときのメッセージ
-    // ----------------------------
-    useEffect(() => {
-        if (searchParams.get("updated") === "1") {
-            setMessage("ジャンルを更新しました。");
-            setTimeout(() => setMessage(""), 5000);
-        }
-    }, [searchParams]);
 
     // ----------------------------
     // ▼ ジャンル追加
