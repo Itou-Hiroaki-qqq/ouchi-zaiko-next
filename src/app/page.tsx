@@ -107,12 +107,8 @@ export default function HomePage() {
   // ----------------------------
 
   if (authLoading) return <div className="p-4">読み込み中...</div>;
+  if (!user) return <AuthRequired />;
 
-  if (!user) {
-    return <AuthRequired />;
-  }
-
-  // ★★★ 修正：homeId が null の時の UI
   if (!homeId) {
     return (
       <div className="p-4">
@@ -130,7 +126,6 @@ export default function HomePage() {
 
   if (genreLoading) return <div className="p-4">読み込み中...</div>;
 
-  // ジャンルがない場合
   if (genres.length === 0) {
     return (
       <div className="p-4">
@@ -195,44 +190,45 @@ export default function HomePage() {
               <div
                 key={item.id}
                 className={
-                  "card shadow p-4 flex flex-row justify-between items-center " +
-                  (isZero
-                    ? "bg-base-200 text-gray-400"
-                    : "bg-base-100")
+                  "card shadow p-2 flex flex-row justify-between items-center " +
+                  (isZero ? "bg-base-200 text-gray-400" : "bg-base-100")
                 }
               >
+                {/* ▼ 次回購入（改行して2行表示） */}
                 <button
-                  className="btn btn-sm btn-accent"
-                  onClick={() =>
-                    handleAddToNext(item.id, item.purchaseCount)
-                  }
+                  className="btn bg-accent text-white min-h-8 h-auto px-2 py-1 flex flex-col leading-tight text-xs"
+                  onClick={() => handleAddToNext(item.id, item.purchaseCount)}
                 >
-                  次回購入
+                  <span>次回</span>
+                  <span>購入</span>
                 </button>
 
+                {/* 商品名 */}
                 <Link
                   href={`/items/${item.id}`}
                   className={`flex-1 mx-4 underline-offset-2 ${isZero
-                    ? "text-gray-400 hover:text-gray-600 hover:underline"
-                    : "hover:underline"
+                      ? "text-gray-400 hover:text-gray-600 hover:underline"
+                      : "hover:underline"
                     }`}
                 >
                   {item.name}
                 </Link>
 
+                {/* ▼ 数量エリア */}
                 <div className="flex items-center gap-2">
                   <button
-                    className="btn btn-sm"
+                    className="btn btn-xs"
                     onClick={() => handleDecrease(item.id, qty)}
                   >
                     -
                   </button>
 
+                  {/* 数量入力（中央揃え & ちょうど良い幅） */}
                   <input
                     type="number"
                     min={0}
                     className={
-                      "input input-bordered w-16 text-center " +
+                      "input input-bordered w-1 text-center " +
                       (isZero ? "text-gray-400" : "")
                     }
                     value={qty}
@@ -242,7 +238,7 @@ export default function HomePage() {
                   />
 
                   <button
-                    className="btn btn-sm"
+                    className="btn btn-xs"
                     onClick={() => handleIncrease(item.id, qty)}
                   >
                     +

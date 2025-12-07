@@ -18,10 +18,13 @@ export default function ItemDetailPage() {
     const { homeId, user, loading: authLoading } = useAuth();
     const { item, loading: itemLoading } = useItem(homeId, itemId);
 
+    // 商品名も編集できるようにする
+    const [name, setName] = useState("");
     const [memo, setMemo] = useState("");
 
     useEffect(() => {
         if (item) {
+            setName(item.name ?? "");
             setMemo(item.memo ?? item.note ?? "");
         }
     }, [item]);
@@ -34,7 +37,7 @@ export default function ItemDetailPage() {
         return <AuthRequired />;
     }
 
-    // ★★★ 修正：homeId=null のとき専用 UI を表示
+    // ★ homeId=null のとき専用 UI
     if (!homeId) {
         return (
             <div className="p-4">
@@ -64,14 +67,16 @@ export default function ItemDetailPage() {
     }
 
     // ---------------------------
-    // ▼ Firestore 更新処理
+    // ▼ Firestore 更新処理（商品名 + memo）
     // ---------------------------
     const handleSave = async () => {
         await updateDoc(doc(db, "homes", homeId, "items", itemId), {
+            name: name.trim(),
             memo,
             updatedAt: new Date(),
         });
-        alert("備考メモを保存しました");
+
+        alert("商品情報を保存しました");
     };
 
     const handleDelete = async () => {
@@ -89,10 +94,15 @@ export default function ItemDetailPage() {
         <div className="p-4 mx-auto max-w-lg space-y-6">
             <h1 className="text-xl font-bold">商品設定ページ</h1>
 
-            {/* 商品名（編集不可） */}
+            {/* 商品名（編集可能に変更） */}
             <div>
-                <span className="font-bold">商品名：</span>
-                <span>{item.name}</span>
+                <label className="label-text font-bold">商品名</label>
+                <input
+                    type="text"
+                    className="input input-bordered w-full mt-1"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                />
             </div>
 
             {/* 備考メモ */}
@@ -109,13 +119,13 @@ export default function ItemDetailPage() {
                 />
             </div>
 
-            {/* 保存 */}
+            {/* 保存ボタン（作成 → 保存 に変更） */}
             <button className="btn btn-primary block" onClick={handleSave}>
-                作成
+                保存
             </button>
 
-            {/* 削除 */}
-            <button className="btn btn-error" onClick={handleDelete}>
+            {/* 削除ボタン（色を btn-warning に変更） */}
+            <button className="btn btn-warning text-base-100" onClick={handleDelete}>
                 この商品を完全に削除する
             </button>
 
