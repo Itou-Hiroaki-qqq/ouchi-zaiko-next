@@ -4,6 +4,11 @@ import DrawerLayout from "../components/DrawerLayout";
 
 export const metadata = {
   title: "おうちで在庫くん",
+  description: "おうちの在庫管理アプリ",
+  robots: {
+    index: false,
+    follow: false,
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
