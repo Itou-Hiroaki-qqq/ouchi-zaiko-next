@@ -7,6 +7,7 @@ import { db } from "../../lib/firebase";
 import { collection, addDoc, deleteDoc, doc, serverTimestamp } from "firebase/firestore";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { AuthRequired } from "../../components/AuthRequired";
 
 export default function GenresPage() {
     const { homeId, loading: authLoading, user } = useAuth();
@@ -19,7 +20,9 @@ export default function GenresPage() {
     // ▼ ローディング
     // ----------------------------
     if (authLoading) return <div className="p-4">読み込み中...</div>;
-    if (!user) return <div className="p-4">ログインが必要です。</div>;
+    if (!user) {
+        return <AuthRequired />;
+    }
 
     // ★★★ 修正：共有解除後の homeId=null を正しく処理
     if (!homeId) {

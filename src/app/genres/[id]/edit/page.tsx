@@ -6,6 +6,7 @@ import { db } from "../../../../lib/firebase";
 import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
+import { AuthRequired } from "../../../../components/AuthRequired";
 
 export default function GenreEditPage() {
     const router = useRouter();
@@ -41,7 +42,9 @@ export default function GenreEditPage() {
     // ▼ ローディング・エラー処理
     // ----------------------------
     if (authLoading) return <div className="p-4">読み込み中...</div>;
-    if (!user) return <div className="p-4">ログインが必要です。</div>;
+    if (!user) {
+        return <AuthRequired />;
+    }
 
     // ★★★ 共有解除されたユーザー用の UI を追加
     if (!homeId) {

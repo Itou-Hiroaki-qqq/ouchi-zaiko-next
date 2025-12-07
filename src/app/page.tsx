@@ -13,6 +13,7 @@ import {
   doc,
   updateDoc,
 } from "firebase/firestore";
+import { AuthRequired } from "@/components/AuthRequired";
 
 export default function HomePage() {
   const { homeId, loading: authLoading, user } = useAuth();
@@ -108,7 +109,7 @@ export default function HomePage() {
   if (authLoading) return <div className="p-4">読み込み中...</div>;
 
   if (!user) {
-    return <div className="p-4">ログインが必要です。</div>;
+    return <AuthRequired />;
   }
 
   // ★★★ 修正：homeId が null の時の UI
@@ -212,8 +213,8 @@ export default function HomePage() {
                 <Link
                   href={`/items/${item.id}`}
                   className={`flex-1 mx-4 underline-offset-2 ${isZero
-                      ? "text-gray-400 hover:text-gray-600 hover:underline"
-                      : "hover:underline"
+                    ? "text-gray-400 hover:text-gray-600 hover:underline"
+                    : "hover:underline"
                     }`}
                 >
                   {item.name}

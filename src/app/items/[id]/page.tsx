@@ -8,6 +8,7 @@ import { useItem } from "../../../hooks/useItem";
 import { db } from "../../../lib/firebase";
 import { doc, updateDoc, deleteDoc } from "firebase/firestore";
 import Link from "next/link";
+import { AuthRequired } from "@/components/AuthRequired";
 
 export default function ItemDetailPage() {
     const router = useRouter();
@@ -29,7 +30,9 @@ export default function ItemDetailPage() {
     // ▼ ローディング・エラー処理
     // ---------------------------
     if (authLoading) return <div className="p-4">認証情報を読み込み中...</div>;
-    if (!user) return <div className="p-4">ログインが必要です。</div>;
+    if (!user) {
+        return <AuthRequired />;
+    }
 
     // ★★★ 修正：homeId=null のとき専用 UI を表示
     if (!homeId) {

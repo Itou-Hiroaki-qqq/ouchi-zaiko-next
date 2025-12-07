@@ -8,6 +8,7 @@ import Link from "next/link";
 
 import { db } from "../../lib/firebase";
 import { doc, updateDoc, increment } from "firebase/firestore";
+import { AuthRequired } from "@/components/AuthRequired";
 
 export default function NextPage() {
     const { homeId, loading: authLoading, user } = useAuth();
@@ -22,7 +23,9 @@ export default function NextPage() {
     // ▼ ローディング処理
     // ----------------------------
     if (authLoading) return <div className="p-4">読み込み中...</div>;
-    if (!user) return <div className="p-4">ログインが必要です。</div>;
+    if (!user) {
+        return <AuthRequired />;
+    }
 
     // ★★★ 修正：homeId が null の場合の UI
     if (!homeId) {
@@ -119,9 +122,8 @@ export default function NextPage() {
                     <button
                         key={genre.id}
                         role="tab"
-                        className={`tab ${
-                            activeGenreId === genre.id ? "tab-active" : ""
-                        }`}
+                        className={`tab ${activeGenreId === genre.id ? "tab-active" : ""
+                            }`}
                         onClick={() => setActiveGenreId(genre.id)}
                     >
                         {genre.name}

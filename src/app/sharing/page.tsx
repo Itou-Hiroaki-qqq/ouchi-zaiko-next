@@ -16,6 +16,7 @@ import {
 import { db } from "../../lib/firebase";
 
 import { useSharedUsers } from "../../hooks/useSharedUsers";
+import { AuthRequired } from "@/components/AuthRequired";
 
 type OwnerInfo = {
     name?: string;
@@ -210,7 +211,9 @@ export default function SharingPage() {
     // ▼ 認証チェック
     // ----------------------------
     if (authLoading) return <div className="p-4">読み込み中...</div>;
-    if (!user) return <div className="p-4">ログインが必要です。</div>;
+    if (!user) {
+        return <AuthRequired />;
+    }
 
     // ============================================================
     // ▼ homeId が null の場合：あなたの指定どおりに表示
