@@ -2,15 +2,23 @@
 
 import Link from "next/link";
 import { useAuth } from "../context/AuthContext";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
+import { useEffect } from "react";
 
 export default function Header() {
     const { logout } = useAuth();
     const router = useRouter();
+    const pathname = usePathname();
 
-    // ログアウト + drawer を閉じて /login に遷移
+    // ▼ ページ遷移したら drawer（ハンバーガーメニュー）を閉じる
+    useEffect(() => {
+        const drawer = document.getElementById("main-menu") as HTMLInputElement | null;
+        if (drawer) drawer.checked = false;
+    }, [pathname]);
+
+    // ▼ ログアウト処理
     const handleLogout = async () => {
-        // Drawer を閉じる
+        // まず drawer を閉じる
         const drawer = document.getElementById("main-menu") as HTMLInputElement | null;
         if (drawer) drawer.checked = false;
 
@@ -81,34 +89,22 @@ export default function Header() {
                     {/* メニュー本体 */}
                     <ul className="menu pt-12 text-lg">
                         <li>
-                            <Link
-                                href="/"
-                                className="hover:text-primary hover:underline transition-all"
-                            >
+                            <Link href="/" className="hover:text-primary hover:underline transition-all">
                                 在庫リスト（TOP）
                             </Link>
                         </li>
                         <li>
-                            <Link
-                                href="/next"
-                                className="hover:text-primary hover:underline transition-all"
-                            >
+                            <Link href="/next" className="hover:text-primary hover:underline transition-all">
                                 次回購入リスト
                             </Link>
                         </li>
                         <li>
-                            <Link
-                                href="/genres"
-                                className="hover:text-primary hover:underline transition-all"
-                            >
+                            <Link href="/genres" className="hover:text-primary hover:underline transition-all">
                                 ジャンル設定
                             </Link>
                         </li>
                         <li>
-                            <Link
-                                href="/sharing"
-                                className="hover:text-primary hover:underline transition-all"
-                            >
+                            <Link href="/sharing" className="hover:text-primary hover:underline transition-all">
                                 共有設定
                             </Link>
                         </li>
