@@ -43,13 +43,10 @@ export default function HomePage() {
       name: newItem.trim(),
       genreId: activeGenreId,
       quantity: 0,
-      // 備考メモ
       memo: "",
       note: "",
-      // 次回購入リスト用
       purchaseCount: 0,
       totalPurchased: 0,
-      // 並び順（とりあえず末尾に追加）
       order: items.length,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -59,7 +56,7 @@ export default function HomePage() {
   };
 
   // ----------------------------
-  // ▼ 数量更新（共通処理）
+  // ▼ 数量更新
   // ----------------------------
   const updateQuantity = async (itemId: string, newQty: number) => {
     if (!homeId) return;
@@ -81,10 +78,7 @@ export default function HomePage() {
     updateQuantity(itemId, (currentQty ?? 0) - 1);
   };
 
-  const handleQuantityInputChange = (
-    itemId: string,
-    value: string
-  ) => {
+  const handleQuantityInputChange = (itemId: string, value: string) => {
     const num = Number(value);
     if (Number.isNaN(num)) return;
     if (num < 0) return;
@@ -92,7 +86,7 @@ export default function HomePage() {
   };
 
   // ----------------------------
-  // ▼ 次回購入リストに追加
+  // ▼ 次回購入リストへ追加
   // ----------------------------
   const handleAddToNext = async (itemId: string, currentCount?: number) => {
     if (!homeId) return;
@@ -108,44 +102,47 @@ export default function HomePage() {
   };
 
   // ----------------------------
-  // ▼ UI 分岐（Hooks の後！）
+  // ▼ UI 分岐
   // ----------------------------
 
-  // Auth 読み込み中
-  if (authLoading) {
-    return <div className="p-4">読み込み中...</div>;
-  }
+  if (authLoading) return <div className="p-4">読み込み中...</div>;
 
-  // 未ログイン
   if (!user) {
     return <div className="p-4">ログインが必要です。</div>;
   }
 
-  // homeId がロードされていない（新規登録直後など）
+  // ★★★ 修正：homeId が null の時の UI
   if (!homeId) {
-    return <div className="p-4">データを準備中...</div>;
-  }
-
-  // ジャンルロード中
-  if (genreLoading) {
-    return <div className="p-4">読み込み中...</div>;
-  }
-
-  // ▼ ジャンルがない（最優先で表示！）
-  if (genres.length === 0) {
     return (
       <div className="p-4">
-        <h1 className="text-xl font-bold mb-4">在庫リスト</h1>
-        <p>ジャンルが登録されていません。まずは「ジャンル設定」からジャンルを追加してください。</p>
+        <h2 className="text-lg font-bold mb-2">最初に共有設定が必要です</h2>
+        <p className="mb-4">
+          共有設定ページでオーナー登録をするか、オーナーユーザーから共有設定を受けてください。
+        </p>
+
+        <Link href="/sharing" className="btn btn-primary">
+          共有設定へ
+        </Link>
       </div>
     );
   }
 
-  // ▼ activeGenreId が未設定 → 最初の genre をセット（UI 表示はその次の render で行う）
-  if (!activeGenreId) {
-    return <div className="p-4">読み込み中...</div>;
+  if (genreLoading) return <div className="p-4">読み込み中...</div>;
+
+  // ジャンルがない場合
+  if (genres.length === 0) {
+    return (
+      <div className="p-4">
+        <h1 className="text-xl font-bold mb-4">在庫リスト</h1>
+        <p>
+          ジャンルが登録されていません。
+          まずは「ジャンル設定」からジャンルを追加してください。
+        </p>
+      </div>
+    );
   }
 
+  if (!activeGenreId) return <div className="p-4">読み込み中...</div>;
 
   // ----------------------------
   // ▼ 通常画面
@@ -203,7 +200,6 @@ export default function HomePage() {
                     : "bg-base-100")
                 }
               >
-                {/* 次回購入ボタン */}
                 <button
                   className="btn btn-sm btn-accent"
                   onClick={() =>
@@ -213,20 +209,16 @@ export default function HomePage() {
                   次回購入
                 </button>
 
-                {/* 商品名（商品設定ページへ） */}
                 <Link
                   href={`/items/${item.id}`}
-                  className={
-                    `flex-1 mx-4 underline-offset-2 
-                    ${isZero
+                  className={`flex-1 mx-4 underline-offset-2 ${isZero
                       ? "text-gray-400 hover:text-gray-600 hover:underline"
-                      : "hover:underline"}`
-                  }
+                      : "hover:underline"
+                    }`}
                 >
                   {item.name}
                 </Link>
 
-                {/* 数量（＋／− と直接入力） */}
                 <div className="flex items-center gap-2">
                   <button
                     className="btn btn-sm"
@@ -244,10 +236,7 @@ export default function HomePage() {
                     }
                     value={qty}
                     onChange={(e) =>
-                      handleQuantityInputChange(
-                        item.id,
-                        e.target.value
-                      )
+                      handleQuantityInputChange(item.id, e.target.value)
                     }
                   />
 

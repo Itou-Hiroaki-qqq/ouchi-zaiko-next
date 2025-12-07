@@ -12,6 +12,8 @@ import { db } from "../lib/firebase";
 import { Genre } from "../types/firestore";
 
 export const useGenres = (homeId: string | null) => {
+    console.log("useGenres start; homeId =", homeId);
+
     const [genres, setGenres] = useState<Genre[]>([]);
     const [loading, setLoading] = useState(true);
 

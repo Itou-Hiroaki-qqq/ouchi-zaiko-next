@@ -41,7 +41,6 @@ export default function RegisterPage() {
 
             const uid = userCredential.user.uid;
 
-            // 表示名セット
             await updateProfile(userCredential.user, { displayName: name });
 
             // ============================
@@ -49,19 +48,21 @@ export default function RegisterPage() {
             // ============================
             const homeRef = await addDoc(collection(db, "homes"), {
                 ownerId: uid,
+                ownerName: name,     // ★追加
+                ownerEmail: email,   // ★追加
                 createdAt: new Date(),
             });
 
             const homeId = homeRef.id;
 
-            // ownerId が確実に書き込まれているかチェック（Firestore の反映遅延対策）
+            // 念のため確認（遅延対策）
             const homeSnap = await getDoc(homeRef);
             if (!homeSnap.exists()) {
                 throw new Error("home の作成確認に失敗しました");
             }
 
             // ============================
-            // ③ members 追加（オーナー）
+            // ③ members にオーナー追加
             // ============================
             await setDoc(doc(db, "homes", homeId, "members", uid), {
                 role: "owner",
@@ -69,7 +70,7 @@ export default function RegisterPage() {
             });
 
             // ============================
-            // ④ users にユーザー情報を作成
+            // ④ users/{uid} の作成
             // ============================
             await setDoc(doc(db, "users", uid), {
                 uid,
@@ -80,7 +81,7 @@ export default function RegisterPage() {
             });
 
             // ============================
-            // ⑤ AuthContext へ反映待ち
+            // ⑤ AuthContext 更新待ち
             // ============================
             await auth.updateCurrentUser(userCredential.user);
             await new Promise((resolve) => setTimeout(resolve, 300));
@@ -90,7 +91,6 @@ export default function RegisterPage() {
         } catch (err: any) {
             console.error(err);
 
-            // FirebaseError のメッセージは長すぎるので一部だけ抽出
             const msg =
                 typeof err?.message === "string"
                     ? err.message.replace("Firebase:", "").trim()

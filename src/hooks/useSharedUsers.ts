@@ -15,21 +15,24 @@ export type SharedUser = {
     email?: string;
 };
 
-export const useSharedUsers = (homeId: string | null, currentUid: string | null) => {
+export const useSharedUsers = (
+    homeId: string | null,
+    currentUid: string | null
+) => {
     const [sharedUsers, setSharedUsers] = useState<SharedUser[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         let unsubscribe: (() => void) | null = null;
 
-        const fetchOwnerAndMembers = async () => {
+        const fetchMembers = async () => {
             if (!homeId || !currentUid) {
                 setSharedUsers([]);
                 setLoading(false);
                 return;
             }
 
-            // ① homes/{homeId} を取得 → ownerId を取り出す
+            // ① homes/{homeId} から ownerId を取得
             const homeRef = doc(db, "homes", homeId);
             const homeSnap = await getDoc(homeRef);
 
@@ -46,45 +49,64 @@ export const useSharedUsers = (homeId: string | null, currentUid: string | null)
                 return;
             }
 
-            // ② users ではなく、members を購読（← Firestore ルール的に必要）
-            const membersRef = collection(db, "homes", homeId, "members");
+            // ② オーナーの場合 → members コレクション全体を購読
+            if (currentUid === ownerId) {
+                const membersRef = collection(db, "homes", homeId, "members");
 
-            unsubscribe = onSnapshot(membersRef, async (snapshot) => {
-                const members = snapshot.docs.map((d) => ({
-                    uid: d.id,
-                    ...(d.data() as any),
-                }));
+                unsubscribe = onSnapshot(membersRef, (snapshot) => {
+                    const members = snapshot.docs.map((d) => ({
+                        uid: d.id,
+                        ...(d.data() as any),
+                    }));
 
-                // ③ オーナー以外を共有ユーザーとする
-                const filtered = members.filter((m) => m.uid !== ownerId);
+                    // オーナー以外を共有ユーザーとみなす
+                    const filtered = members
+                        .filter((m) => m.uid !== ownerId)
+                        .map((m) => ({
+                            uid: m.uid,
+                            name: m.name ?? "",
+                            email: m.email ?? "",
+                        }));
 
-                // もし name/email を表示したいなら users/{uid} を個別 GET（オーナーのみ可）
-                const detailedUsers: SharedUser[] = [];
+                    setSharedUsers(filtered);
+                    setLoading(false);
+                });
 
-                for (const m of filtered) {
-                    try {
-                        const userDoc = await getDoc(doc(db, "users", m.uid));
-                        if (userDoc.exists()) {
-                            const data = userDoc.data() as any;
-                            detailedUsers.push({
-                                uid: m.uid,
-                                name: data.name,
-                                email: data.email,
-                            });
-                        } else {
-                            detailedUsers.push({ uid: m.uid });
-                        }
-                    } catch {
-                        detailedUsers.push({ uid: m.uid });
-                    }
+                return;
+            }
+
+            // ③ 共有ユーザーの場合 → 自分自身の members ドキュメントだけ購読
+            const myMemberRef = doc(db, "homes", homeId, "members", currentUid);
+
+            unsubscribe = onSnapshot(myMemberRef, async (snap) => {
+                if (!snap.exists()) {
+                    setSharedUsers([]);
+                    setLoading(false);
+                    return;
                 }
 
-                setSharedUsers(detailedUsers);
+                // members/{uid} → user 情報を users/{uid} から取得
+                const userDoc = await getDoc(doc(db, "users", currentUid));
+
+                if (userDoc.exists()) {
+                    const data = userDoc.data() as any;
+
+                    setSharedUsers([
+                        {
+                            uid: currentUid,
+                            name: data.name ?? "",
+                            email: data.email ?? "",
+                        },
+                    ]);
+                } else {
+                    setSharedUsers([{ uid: currentUid }]);
+                }
+
                 setLoading(false);
             });
         };
 
-        fetchOwnerAndMembers();
+        fetchMembers();
 
         return () => {
             if (unsubscribe) unsubscribe();

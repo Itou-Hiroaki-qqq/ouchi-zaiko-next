@@ -6,6 +6,8 @@ import { db } from "../lib/firebase";
 import { Item } from "../types/firestore";
 
 export const useItems = (homeId: string | null, genreId: string | null) => {
+    console.log("useItems start; homeId =", homeId, "genreId =", genreId);
+    
     const [items, setItems] = useState<Item[]>([]);
     const [loading, setLoading] = useState(true);
 

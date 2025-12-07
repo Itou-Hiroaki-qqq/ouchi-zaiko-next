@@ -5,18 +5,21 @@ import { useAuth } from "../../../../context/AuthContext";
 import { db } from "../../../../lib/firebase";
 import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { useRouter, useParams } from "next/navigation";
+import Link from "next/link";
 
 export default function GenreEditPage() {
     const router = useRouter();
     const params = useParams();
-    const { homeId } = useAuth();
+    const { homeId, user, loading: authLoading } = useAuth();
 
     const genreId = params.id as string;
 
     const [name, setName] = useState("");
     const [loading, setLoading] = useState(true);
 
-    // Firestore から現在のジャンル名を取得
+    // ----------------------------
+    // ▼ Firestore からジャンル取得
+    // ----------------------------
     useEffect(() => {
         if (!homeId) return;
 
@@ -34,6 +37,35 @@ export default function GenreEditPage() {
         fetchData();
     }, [homeId, genreId]);
 
+    // ----------------------------
+    // ▼ ローディング・エラー処理
+    // ----------------------------
+    if (authLoading) return <div className="p-4">読み込み中...</div>;
+    if (!user) return <div className="p-4">ログインが必要です。</div>;
+
+    // ★★★ 共有解除されたユーザー用の UI を追加
+    if (!homeId) {
+        return (
+            <div className="p-4">
+                <h2 className="text-lg font-bold mb-2">最初に共有設定が必要です</h2>
+                <p className="mb-4">
+                    共有設定ページでオーナー登録をするか、オーナーユーザーから共有設定を受けてください。
+                </p>
+
+                <Link href="/sharing" className="btn btn-primary">
+                    共有設定へ
+                </Link>
+            </div>
+        );
+    }
+
+    if (loading) {
+        return <div className="p-4">読み込み中...</div>;
+    }
+
+    // ----------------------------
+    // ▼ 更新
+    // ----------------------------
     const handleUpdate = async () => {
         if (!name.trim()) return;
 
@@ -44,7 +76,6 @@ export default function GenreEditPage() {
             updatedAt: serverTimestamp(),
         });
 
-        // 編集後に一覧ページへ戻る + メッセージ表示
         router.push("/genres?updated=1");
     };
 
@@ -52,10 +83,9 @@ export default function GenreEditPage() {
         router.push("/genres");
     };
 
-    if (loading) {
-        return <div className="p-4">読み込み中...</div>;
-    }
-
+    // ----------------------------
+    // ▼ 表示
+    // ----------------------------
     return (
         <div className="p-4 max-w-md mx-auto">
             <h1 className="text-xl font-bold mb-4">ジャンル編集</h1>

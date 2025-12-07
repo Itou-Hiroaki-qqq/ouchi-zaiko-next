@@ -9,15 +9,37 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 export default function GenresPage() {
-    const { homeId } = useAuth();
+    const { homeId, loading: authLoading, user } = useAuth();
     const { genres, loading } = useGenres(homeId);
     const [newGenre, setNewGenre] = useState("");
     const [message, setMessage] = useState("");
     const searchParams = useSearchParams();
 
-    if (!homeId) return <div className="p-4">読み込み中...</div>;
+    // ----------------------------
+    // ▼ ローディング
+    // ----------------------------
+    if (authLoading) return <div className="p-4">読み込み中...</div>;
+    if (!user) return <div className="p-4">ログインが必要です。</div>;
 
-    // 編集から戻ってきたらメッセージを表示
+    // ★★★ 修正：共有解除後の homeId=null を正しく処理
+    if (!homeId) {
+        return (
+            <div className="p-4">
+                <h2 className="text-lg font-bold mb-2">最初に共有設定が必要です</h2>
+                <p className="mb-4">
+                    共有設定ページでオーナー登録をするか、オーナーユーザーから共有設定を受けてください。
+                </p>
+
+                <Link href="/sharing" className="btn btn-primary">
+                    共有設定へ
+                </Link>
+            </div>
+        );
+    }
+
+    // ----------------------------
+    // ▼ 編集から戻ったときのメッセージ
+    // ----------------------------
     useEffect(() => {
         if (searchParams.get("updated") === "1") {
             setMessage("ジャンルを更新しました。");
@@ -25,12 +47,15 @@ export default function GenresPage() {
         }
     }, [searchParams]);
 
+    // ----------------------------
+    // ▼ ジャンル追加
+    // ----------------------------
     const handleAdd = async () => {
         if (!newGenre.trim()) return;
 
         await addDoc(collection(db, "homes", homeId, "genres"), {
             name: newGenre.trim(),
-            order: genres.length,   // ← order を使って並び順に合致
+            order: genres.length,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
         });
@@ -41,6 +66,9 @@ export default function GenresPage() {
         setTimeout(() => setMessage(""), 5000);
     };
 
+    // ----------------------------
+    // ▼ ジャンル削除
+    // ----------------------------
     const handleDelete = async (id: string) => {
         const ok = confirm("削除してよろしいですか？");
         if (!ok) return;
@@ -51,6 +79,9 @@ export default function GenresPage() {
         setTimeout(() => setMessage(""), 5000);
     };
 
+    // ----------------------------
+    // ▼ UI
+    // ----------------------------
     return (
         <div className="p-4">
             <h1 className="text-xl font-bold mb-4">ジャンル一覧</h1>

@@ -23,7 +23,23 @@ export default function NextPage() {
     // ----------------------------
     if (authLoading) return <div className="p-4">読み込み中...</div>;
     if (!user) return <div className="p-4">ログインが必要です。</div>;
-    if (!homeId) return <div className="p-4">データを準備中...</div>;
+
+    // ★★★ 修正：homeId が null の場合の UI
+    if (!homeId) {
+        return (
+            <div className="p-4">
+                <h2 className="text-lg font-bold mb-2">最初に共有設定が必要です</h2>
+                <p className="mb-4">
+                    共有設定ページでオーナー登録をするか、オーナーユーザーから共有設定を受けてください。
+                </p>
+
+                <Link href="/sharing" className="btn btn-primary">
+                    共有設定へ
+                </Link>
+            </div>
+        );
+    }
+
     if (nextLoading) return <div className="p-4">読み込み中...</div>;
 
     // purchaseCount > 0 の商品のみ
@@ -62,7 +78,7 @@ export default function NextPage() {
 
         await updateDoc(ref, {
             quantity: increment(1),
-            purchaseCount: 0, // リストから削除
+            purchaseCount: 0,
             updatedAt: new Date(),
         });
 
@@ -126,7 +142,6 @@ export default function NextPage() {
                                 {item.name}
                             </Link>
 
-                            {/* ▼購入済み */}
                             <button
                                 className="btn btn-sm btn-success ml-4"
                                 onClick={() => handlePurchased(item.id)}
@@ -134,7 +149,6 @@ export default function NextPage() {
                                 購入済み
                             </button>
 
-                            {/* ▼購入やめ */}
                             <button
                                 className="btn btn-sm btn-warning ml-2"
                                 onClick={() => handleCancel(item.id)}

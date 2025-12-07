@@ -58,43 +58,58 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            setUser(currentUser);
 
-            if (!currentUser) {
+            console.log("AuthStateChanged triggered. currentUser =", currentUser?.uid);
+
+            // ① uid が未確定のとき → Firestore に触らない（PermissionDenied防止）
+            if (!currentUser?.uid) {
+                console.log("currentUser.uid が未確定のため Firestore にアクセスしません");
+                setUser(null);
                 setHomeId(null);
                 setLoading(false);
                 return;
             }
 
-            // ← ここでは loading を false にせず、Firestore 読み込みを待つ
+            // user はここで初めてセット（hooks が早く動きすぎるのを防ぐ）
+            setUser(currentUser);
+
             try {
                 let userData = null;
 
-                // Firestore の /users/{uid} が作成されるまで少し待機
-                for (let i = 0; i < 5; i++) {   // 最大5回リトライ（500ms）
-                    const snap = await getDoc(doc(db, "users", currentUser.uid));
+                // ② /users/{uid} を最大5回リトライ（Auth と Firestore の同期遅延に対応）
+                for (let i = 0; i < 5; i++) {
+                    console.log(`Trying to read users/${currentUser.uid}`);
+
+                    const ref = doc(db, "users", currentUser.uid);
+                    const snap = await getDoc(ref);
+
                     if (snap.exists()) {
+                        console.log("users doc found:", snap.data());
                         userData = snap.data();
                         break;
+                    } else {
+                        console.log("users doc NOT found. retry...");
+                        await new Promise((res) => setTimeout(res, 120));
                     }
-                    await new Promise((res) => setTimeout(res, 100)); // 100ms待つ
                 }
 
-                if (userData) {
-                    setHomeId(userData.homeId ?? null);
-                } else {
-                    console.warn("Firestore の users ドキュメントがまだ取得できませんでした");
+                if (!userData) {
+                    console.warn("ERROR: users/{uid} が最後まで取得できませんでした");
                     setHomeId(null);
+                } else {
+                    console.log("Setting homeId:", userData.homeId);
+                    setHomeId(userData.homeId ?? null);
                 }
 
+            } catch (e) {
+                console.error("AuthContext Firestore read ERROR:", e);
             } finally {
-                setLoading(false);  // ← homeId をセットした後に初めて loading を解除！
+                setLoading(false);
             }
         });
 
         return () => unsubscribe();
     }, []);
-
 
     return (
         <AuthContext.Provider

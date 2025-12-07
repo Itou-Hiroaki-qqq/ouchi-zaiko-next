@@ -17,10 +17,8 @@ export default function ItemDetailPage() {
     const { homeId, user, loading: authLoading } = useAuth();
     const { item, loading: itemLoading } = useItem(homeId, itemId);
 
-    // ローカル編集用 state（商品名は編集不可なので name は state 管理しない）
     const [memo, setMemo] = useState("");
 
-    // Firestore のデータを state に反映
     useEffect(() => {
         if (item) {
             setMemo(item.memo ?? item.note ?? "");
@@ -32,7 +30,23 @@ export default function ItemDetailPage() {
     // ---------------------------
     if (authLoading) return <div className="p-4">認証情報を読み込み中...</div>;
     if (!user) return <div className="p-4">ログインが必要です。</div>;
-    if (!homeId) return <div className="p-4">データ準備中...</div>;
+
+    // ★★★ 修正：homeId=null のとき専用 UI を表示
+    if (!homeId) {
+        return (
+            <div className="p-4">
+                <h2 className="text-lg font-bold mb-2">最初に共有設定が必要です</h2>
+                <p className="mb-4">
+                    共有設定ページでオーナー登録をするか、オーナーユーザーから共有設定を受けてください。
+                </p>
+
+                <Link href="/sharing" className="btn btn-primary">
+                    共有設定へ
+                </Link>
+            </div>
+        );
+    }
+
     if (itemLoading) return <div className="p-4">商品情報を読み込み中...</div>;
 
     if (!item) {
@@ -72,7 +86,7 @@ export default function ItemDetailPage() {
         <div className="p-4 mx-auto max-w-lg space-y-6">
             <h1 className="text-xl font-bold">商品設定ページ</h1>
 
-            {/* 商品名（編集できない固定テキスト） */}
+            {/* 商品名（編集不可） */}
             <div>
                 <span className="font-bold">商品名：</span>
                 <span>{item.name}</span>
@@ -92,12 +106,12 @@ export default function ItemDetailPage() {
                 />
             </div>
 
-            {/* ボタン：作成（保存） */}
+            {/* 保存 */}
             <button className="btn btn-primary block" onClick={handleSave}>
                 作成
             </button>
 
-            {/* 削除ボタン（下に配置） */}
+            {/* 削除 */}
             <button className="btn btn-error" onClick={handleDelete}>
                 この商品を完全に削除する
             </button>
