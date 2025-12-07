@@ -10,9 +10,8 @@ import {
     onAuthStateChanged,
     User,
     signOut,
-    browserLocalPersistence,
-    browserSessionPersistence,
     setPersistence,
+    indexedDBLocalPersistence,   // ★★★ 追加：IndexedDB 永続化を使用
 } from "firebase/auth";
 import { auth, db } from "../lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
@@ -23,7 +22,6 @@ interface AuthContextType {
     loading: boolean;
     homeId: string | null;
     logout: () => Promise<void>;
-    setRemember: (remember: boolean) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -31,7 +29,6 @@ const AuthContext = createContext<AuthContextType>({
     loading: true,
     homeId: null,
     logout: async () => {},
-    setRemember: async () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -41,24 +38,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [homeId, setHomeId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
-    // ▼ ログイン状態の永続化を強制的に local に設定
-    useEffect(() => {
-        setPersistence(auth, browserLocalPersistence)
-            .then(() => console.log("Persistence set to LOCAL"))
-            .catch((err) => console.error("Failed to set persistence:", err));
-    }, []);
-
-    const setRemember = async (remember: boolean) => {
-        await setPersistence(
-            auth,
-            remember ? browserLocalPersistence : browserSessionPersistence
-        );
-    };
-
     const logout = async () => {
         await signOut(auth);
     };
 
+    // -------------------------------
+    // ★★★ ここが重要：永続化を IndexedDB に統一
+    // -------------------------------
+    useEffect(() => {
+        setPersistence(auth, indexedDBLocalPersistence)
+            .then(() => console.log("Auth persistence set: IndexedDB"))
+            .catch((err) =>
+                console.error("Failed to set Auth persistence:", err)
+            );
+    }, []);
+
+    // Auth Cookie Listener (必要なら保持)
     useEffect(() => {
         setupAuthCookieListener();
     }, []);
@@ -67,20 +62,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             console.log("AuthStateChanged triggered. currentUser =", currentUser?.uid);
 
-            if (!currentUser?.uid) {
-                console.log("currentUser.uid が未確定のため Firestore にアクセスしません");
+            // 未ログイン
+            if (!currentUser) {
                 setUser(null);
                 setHomeId(null);
                 setLoading(false);
                 return;
             }
 
+            // ログインユーザーセット
             setUser(currentUser);
 
             try {
                 let userData = null;
 
-                // ▼ Firestore users/{uid} の取得リトライ（最大5回）
+                // users/{uid} を最大5回リトライ
                 for (let i = 0; i < 5; i++) {
                     console.log(`Trying to read users/${currentUser.uid}`);
 
@@ -98,7 +94,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 }
 
                 if (!userData) {
-                    console.warn("ERROR: users/{uid} が最後まで取得できませんでした");
+                    console.warn("ERROR: users/{uid} が取得できませんでした");
                     setHomeId(null);
                 } else {
                     console.log("Setting homeId:", userData.homeId);
@@ -117,7 +113,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     return (
         <AuthContext.Provider
-            value={{ user, loading, homeId, logout, setRemember }}
+            value={{ user, loading, homeId, logout }}
         >
             {children}
         </AuthContext.Provider>

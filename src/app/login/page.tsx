@@ -5,16 +5,13 @@ import Link from "next/link";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../../lib/firebase";
 import { useRouter } from "next/navigation";
-import { useAuth } from "../../context/AuthContext";
 
 export default function LoginPage() {
     const router = useRouter();
-    const { setRemember } = useAuth();
 
     // フォーム状態
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-    const [remember, setRememberState] = useState(false);
     const [error, setError] = useState("");
 
     const handleLogin = async () => {
@@ -26,13 +23,9 @@ export default function LoginPage() {
         }
 
         try {
-            // ログイン状態の永続化（local or session）
-            await setRemember(remember);
-
-            // Firebase Auth ログイン処理
+            // ★★★ 永続化セットは不要（AuthContext が自動で IndexedDB に設定）
             await signInWithEmailAndPassword(auth, email, password);
 
-            // ログイン成功 → トップページへ移動
             router.push("/");
         } catch (err: any) {
             console.error(err);
@@ -69,16 +62,8 @@ export default function LoginPage() {
                     />
                 </label>
 
-                {/* Remember me */}
-                <label className="flex items-center gap-2 mb-4 cursor-pointer">
-                    <input
-                        type="checkbox"
-                        className="checkbox checkbox-primary"
-                        checked={remember}
-                        onChange={(e) => setRememberState(e.target.checked)}
-                    />
-                    <span className="label-text">ログイン情報を記録する</span>
-                </label>
+                {/* ★★★ Remember Me は削除または無効化（今は動かないため） */}
+                {/* 将来 remember-me を実装したい場合は再追加可能 */}
 
                 {/* Buttons */}
                 <div className="flex justify-between items-center">
