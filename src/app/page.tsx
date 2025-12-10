@@ -114,7 +114,8 @@ export default function HomePage() {
       <div className="p-4">
         <h2 className="text-lg font-bold mb-2">最初に共有設定が必要です</h2>
         <p className="mb-4">
-          共有設定ページでオーナー登録をするか、オーナーユーザーから共有設定を受けてください。
+          共有設定ページでオーナー登録をするか、
+          オーナーユーザーから共有設定を受けてください。
         </p>
 
         <Link href="/sharing" className="btn btn-primary">
@@ -139,6 +140,21 @@ export default function HomePage() {
   }
 
   if (!activeGenreId) return <div className="p-4">読み込み中...</div>;
+
+  // ----------------------------
+  // ▼ 並び替え（最重要ロジック）
+  // ----------------------------
+  const sortedItems = [...items].sort((a, b) => {
+    const qtyA = a.quantity ?? 0;
+    const qtyB = b.quantity ?? 0;
+
+    // 最優先：数量 0 の商品を上に
+    if (qtyA === 0 && qtyB !== 0) return -1;
+    if (qtyA !== 0 && qtyB === 0) return 1;
+
+    // 次：登録順
+    return (a.order ?? 0) - (b.order ?? 0);
+  });
 
   // ----------------------------
   // ▼ 通常画面
@@ -178,11 +194,11 @@ export default function HomePage() {
       {/* ▼ 商品一覧 */}
       {itemLoading ? (
         <p>読み込み中...</p>
-      ) : items.length === 0 ? (
+      ) : sortedItems.length === 0 ? (
         <p>登録されている商品はありません。</p>
       ) : (
         <div className="space-y-3">
-          {items.map((item) => {
+          {sortedItems.map((item) => {
             const qty = item.quantity ?? 0;
             const isZero = qty === 0;
 
@@ -194,7 +210,7 @@ export default function HomePage() {
                   (isZero ? "bg-base-200 text-gray-400" : "bg-base-100")
                 }
               >
-                {/* ▼ 次回購入（改行して2行表示） */}
+                {/* ▼ 次回購入（2行表示） */}
                 <button
                   className="btn bg-accent text-white min-h-8 h-auto px-2 py-1 flex flex-col leading-tight text-xs"
                   onClick={() => handleAddToNext(item.id, item.purchaseCount)}
@@ -206,10 +222,11 @@ export default function HomePage() {
                 {/* 商品名 */}
                 <Link
                   href={`/items/${item.id}`}
-                  className={`flex-1 mx-4 underline-offset-2 ${isZero
+                  className={`flex-1 mx-4 underline-offset-2 ${
+                    isZero
                       ? "text-gray-400 hover:text-gray-600 hover:underline"
                       : "hover:underline"
-                    }`}
+                  }`}
                 >
                   {item.name}
                 </Link>
@@ -223,12 +240,11 @@ export default function HomePage() {
                     -
                   </button>
 
-                  {/* 数量入力（中央揃え & ちょうど良い幅） */}
                   <input
                     type="number"
                     min={0}
                     className={
-                      "input input-bordered w-1 text-center " +
+                      "input input-bordered w-10 text-center " +
                       (isZero ? "text-gray-400" : "")
                     }
                     value={qty}
