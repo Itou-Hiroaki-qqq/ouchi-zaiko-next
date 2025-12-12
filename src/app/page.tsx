@@ -105,7 +105,6 @@ export default function HomePage() {
   // ----------------------------
   // ▼ UI 分岐
   // ----------------------------
-
   if (authLoading) return <div className="p-4">読み込み中...</div>;
   if (!user) return <AuthRequired />;
 
@@ -142,17 +141,25 @@ export default function HomePage() {
   if (!activeGenreId) return <div className="p-4">読み込み中...</div>;
 
   // ----------------------------
-  // ▼ 並び替え（最重要ロジック）
+  // ▼ 並び替え（新仕様）
   // ----------------------------
   const sortedItems = [...items].sort((a, b) => {
     const qtyA = a.quantity ?? 0;
     const qtyB = b.quantity ?? 0;
 
-    // 最優先：数量 0 の商品を上に
-    if (qtyA === 0 && qtyB !== 0) return -1;
-    if (qtyA !== 0 && qtyB === 0) return 1;
+    // ① 数量が少ないものほど上
+    if (qtyA !== qtyB) {
+      return qtyA - qtyB;
+    }
 
-    // 次：登録順
+    // ② 過去の購入数が多いもの
+    const totalA = a.totalPurchased ?? 0;
+    const totalB = b.totalPurchased ?? 0;
+    if (totalA !== totalB) {
+      return totalB - totalA;
+    }
+
+    // ③ 登録順
     return (a.order ?? 0) - (b.order ?? 0);
   });
 
@@ -163,7 +170,6 @@ export default function HomePage() {
     <div className="p-4">
       <h1 className="text-xl font-bold mb-4">在庫リスト</h1>
 
-      {/* ▼ ジャンルタブ */}
       <div role="tablist" className="tabs tabs-bordered mb-4">
         {genres.map((genre) => (
           <button
@@ -177,7 +183,6 @@ export default function HomePage() {
         ))}
       </div>
 
-      {/* ▼ 商品登録フォーム */}
       <div className="flex gap-2 mb-4">
         <input
           type="text"
@@ -191,7 +196,6 @@ export default function HomePage() {
         </button>
       </div>
 
-      {/* ▼ 商品一覧 */}
       {itemLoading ? (
         <p>読み込み中...</p>
       ) : sortedItems.length === 0 ? (
@@ -210,7 +214,6 @@ export default function HomePage() {
                   (isZero ? "bg-base-200 text-gray-400" : "bg-base-100")
                 }
               >
-                {/* ▼ 次回購入（2行表示） */}
                 <button
                   className="btn bg-accent text-white min-h-8 h-auto px-2 py-1 flex flex-col leading-tight text-xs"
                   onClick={() => handleAddToNext(item.id, item.purchaseCount)}
@@ -219,7 +222,6 @@ export default function HomePage() {
                   <span>購入</span>
                 </button>
 
-                {/* 商品名 */}
                 <Link
                   href={`/items/${item.id}`}
                   className={`flex-1 mx-4 underline-offset-2 ${
@@ -231,7 +233,6 @@ export default function HomePage() {
                   {item.name}
                 </Link>
 
-                {/* ▼ 数量エリア */}
                 <div className="flex items-center gap-2">
                   <button
                     className="btn btn-xs"
