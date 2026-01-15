@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useGenres } from "../hooks/useGenres";
 import { useItems } from "../hooks/useItems";
@@ -14,12 +14,16 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { AuthRequired } from "@/components/AuthRequired";
+import { Item } from "../types/firestore";
 
 export default function HomePage() {
   const { homeId, loading: authLoading, user } = useAuth();
 
   const [activeGenreId, setActiveGenreId] = useState<string | null>(null);
   const [newItem, setNewItem] = useState("");
+  const [sortedItems, setSortedItems] = useState<Item[]>([]);
+  const prevGenreIdRef = useRef<string | null>(null);
+  const prevItemLoadingRef = useRef(true);
 
   const { genres, loading: genreLoading } = useGenres(homeId);
   const { items, loading: itemLoading } = useItems(homeId, activeGenreId);
@@ -32,6 +36,87 @@ export default function HomePage() {
       setActiveGenreId(genres[0].id);
     }
   }, [genres, activeGenreId]);
+
+  // ----------------------------
+  // ▼ 並び替え（画面遷移・リロード時のみ適用）
+  // ----------------------------
+  useEffect(() => {
+    // ジャンル変更時、または初回ロード完了時にのみ並び替えを適用
+    const genreChanged = prevGenreIdRef.current !== activeGenreId;
+    const initialLoadComplete = prevItemLoadingRef.current && !itemLoading;
+
+    if (!genreChanged && !initialLoadComplete) {
+      // 数量変更や商品追加による更新の場合は、sortedItemsを更新するが並び替えはしない
+      if (!itemLoading && items.length > 0) {
+        setSortedItems((prevSorted) => {
+          const prevItemIds = new Set(prevSorted.map((item) => item.id));
+          const currentItemIds = new Set(items.map((item) => item.id));
+          
+          // 新しい商品が追加された場合は並び替えを適用
+          const hasNewItems = items.some((item) => !prevItemIds.has(item.id));
+          // 商品が削除された場合も並び替えを適用
+          const hasRemovedItems = prevSorted.some((item) => !currentItemIds.has(item.id));
+          
+          if (hasNewItems || hasRemovedItems) {
+            // 商品の追加・削除があった場合は並び替えを適用
+            const sorted = [...items].sort((a, b) => {
+              const qtyA = a.quantity ?? 0;
+              const qtyB = b.quantity ?? 0;
+              if (qtyA !== qtyB) {
+                return qtyA - qtyB;
+              }
+              const totalA = a.totalPurchased ?? 0;
+              const totalB = b.totalPurchased ?? 0;
+              if (totalA !== totalB) {
+                return totalB - totalA;
+              }
+              return (a.order ?? 0) - (b.order ?? 0);
+            });
+            return sorted;
+          }
+          
+          // 数量変更のみの場合は、数量だけを更新（並び替えはしない）
+          return prevSorted.map((sortedItem) => {
+            const updatedItem = items.find((item) => item.id === sortedItem.id);
+            return updatedItem ? { ...sortedItem, quantity: updatedItem.quantity } : sortedItem;
+          });
+        });
+      }
+      prevItemLoadingRef.current = itemLoading;
+      return;
+    }
+
+    // ジャンル変更時または初回ロード完了時は並び替えを適用
+    prevGenreIdRef.current = activeGenreId;
+    prevItemLoadingRef.current = itemLoading;
+
+    if (items.length === 0) {
+      setSortedItems([]);
+      return;
+    }
+
+    const sorted = [...items].sort((a, b) => {
+      const qtyA = a.quantity ?? 0;
+      const qtyB = b.quantity ?? 0;
+
+      // ① 数量が少ないものほど上
+      if (qtyA !== qtyB) {
+        return qtyA - qtyB;
+      }
+
+      // ② 過去の購入数が多いもの
+      const totalA = a.totalPurchased ?? 0;
+      const totalB = b.totalPurchased ?? 0;
+      if (totalA !== totalB) {
+        return totalB - totalA;
+      }
+
+      // ③ 登録順
+      return (a.order ?? 0) - (b.order ?? 0);
+    });
+
+    setSortedItems(sorted);
+  }, [activeGenreId, itemLoading, items]);
 
   // ----------------------------
   // ▼ 商品追加
@@ -139,29 +224,6 @@ export default function HomePage() {
   }
 
   if (!activeGenreId) return <div className="p-4">読み込み中...</div>;
-
-  // ----------------------------
-  // ▼ 並び替え（新仕様）
-  // ----------------------------
-  const sortedItems = [...items].sort((a, b) => {
-    const qtyA = a.quantity ?? 0;
-    const qtyB = b.quantity ?? 0;
-
-    // ① 数量が少ないものほど上
-    if (qtyA !== qtyB) {
-      return qtyA - qtyB;
-    }
-
-    // ② 過去の購入数が多いもの
-    const totalA = a.totalPurchased ?? 0;
-    const totalB = b.totalPurchased ?? 0;
-    if (totalA !== totalB) {
-      return totalB - totalA;
-    }
-
-    // ③ 登録順
-    return (a.order ?? 0) - (b.order ?? 0);
-  });
 
   // ----------------------------
   // ▼ 通常画面
