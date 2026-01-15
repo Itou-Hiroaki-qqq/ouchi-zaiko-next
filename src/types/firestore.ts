@@ -15,6 +15,9 @@ export interface Item {
     // 現在画面で扱っている在庫数量
     quantity: number;
 
+    // 定数（標準在庫数量）
+    standardQuantity?: number;
+
     // メモ系フィールド
     // 実際の Firestore では "memo" というフィールド名で保存しているので、
     // それに合わせて memo を追加。過去の互換のため note も残しておく。

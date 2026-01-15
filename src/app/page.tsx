@@ -12,6 +12,7 @@ import {
   addDoc,
   doc,
   updateDoc,
+  deleteField,
 } from "firebase/firestore";
 import { AuthRequired } from "@/components/AuthRequired";
 import { Item } from "../types/firestore";
@@ -75,10 +76,16 @@ export default function HomePage() {
             return sorted;
           }
           
-          // 数量変更のみの場合は、数量だけを更新（並び替えはしない）
+          // 数量変更や定数変更のみの場合は、該当フィールドだけを更新（並び替えはしない）
           return prevSorted.map((sortedItem) => {
             const updatedItem = items.find((item) => item.id === sortedItem.id);
-            return updatedItem ? { ...sortedItem, quantity: updatedItem.quantity } : sortedItem;
+            return updatedItem
+              ? {
+                  ...sortedItem,
+                  quantity: updatedItem.quantity,
+                  standardQuantity: updatedItem.standardQuantity,
+                }
+              : sortedItem;
           });
         });
       }
@@ -129,6 +136,7 @@ export default function HomePage() {
       name: newItem.trim(),
       genreId: activeGenreId,
       quantity: 0,
+      standardQuantity: undefined,
       memo: "",
       note: "",
       purchaseCount: 0,
@@ -169,6 +177,49 @@ export default function HomePage() {
     if (Number.isNaN(num)) return;
     if (num < 0) return;
     updateQuantity(itemId, num);
+  };
+
+  // ----------------------------
+  // ▼ 定数更新
+  // ----------------------------
+  const handleStandardQuantityChange = (itemId: string, value: string) => {
+    // 空文字の場合は即座にブランクとして保存
+    if (value === "") {
+      updateStandardQuantity(itemId, "");
+      return;
+    }
+
+    // 数字のみを許可（先頭の0は許可しないが、0自体は許可）
+    if (!/^\d+$/.test(value)) {
+      return; // 数字以外の文字が含まれている場合は無視
+    }
+
+    const num = Number(value);
+    if (num < 0) return;
+
+    updateStandardQuantity(itemId, value);
+  };
+
+  const updateStandardQuantity = async (itemId: string, value: string) => {
+    if (!homeId) return;
+
+    // 空文字の場合はフィールドを削除（ブランク）として保存
+    if (value === "" || value.trim() === "") {
+      await updateDoc(doc(db, "homes", homeId, "items", itemId), {
+        standardQuantity: deleteField(),
+        updatedAt: new Date(),
+      });
+      return;
+    }
+
+    const num = Number(value);
+    if (Number.isNaN(num)) return;
+    if (num < 0) return;
+
+    await updateDoc(doc(db, "homes", homeId, "items", itemId), {
+      standardQuantity: num,
+      updatedAt: new Date(),
+    });
   };
 
   // ----------------------------
@@ -277,7 +328,7 @@ export default function HomePage() {
                 }
               >
                 <button
-                  className="btn bg-accent text-white min-h-8 h-auto px-2 py-1 flex flex-col leading-tight text-xs"
+                  className="btn bg-accent text-white min-h-6 h-auto px-1.5 py-0.5 flex flex-col leading-tight text-[10px]"
                   onClick={() => handleAddToNext(item.id, item.purchaseCount)}
                 >
                   <span>次回</span>
@@ -296,32 +347,51 @@ export default function HomePage() {
                 </Link>
 
                 <div className="flex items-center gap-2">
-                  <button
-                    className="btn btn-xs"
-                    onClick={() => handleDecrease(item.id, qty)}
-                  >
-                    -
-                  </button>
+                  {/* 定数表示欄 */}
+                  <div className="flex flex-col items-center">
+                    <span className="text-[10px] text-gray-500 mb-0.5">定数</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      className="input input-bordered w-10 h-7 text-center text-xs p-0"
+                      value={item.standardQuantity ?? ""}
+                      onChange={(e) =>
+                        handleStandardQuantityChange(item.id, e.target.value)
+                      }
+                      placeholder=""
+                    />
+                  </div>
 
-                  <input
-                    type="number"
-                    min={0}
-                    className={
-                      "input input-bordered w-10 text-center " +
-                      (isZero ? "text-gray-400" : "")
-                    }
-                    value={qty}
-                    onChange={(e) =>
-                      handleQuantityInputChange(item.id, e.target.value)
-                    }
-                  />
+                  {/* 数量表示欄 */}
+                  <div className="flex items-center gap-1">
+                    <button
+                      className="btn btn-xs"
+                      onClick={() => handleDecrease(item.id, qty)}
+                    >
+                      -
+                    </button>
 
-                  <button
-                    className="btn btn-xs"
-                    onClick={() => handleIncrease(item.id, qty)}
-                  >
-                    +
-                  </button>
+                    <input
+                      type="number"
+                      min={0}
+                      className={
+                        "input input-bordered w-10 text-center " +
+                        (isZero ? "text-gray-400" : "")
+                      }
+                      value={qty}
+                      onChange={(e) =>
+                        handleQuantityInputChange(item.id, e.target.value)
+                      }
+                    />
+
+                    <button
+                      className="btn btn-xs"
+                      onClick={() => handleIncrease(item.id, qty)}
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
               </div>
             );
