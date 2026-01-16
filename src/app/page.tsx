@@ -136,7 +136,6 @@ export default function HomePage() {
       name: newItem.trim(),
       genreId: activeGenreId,
       quantity: 0,
-      standardQuantity: undefined,
       memo: "",
       note: "",
       purchaseCount: 0,
