@@ -12,6 +12,7 @@ import {
     where,
     setDoc,
     deleteDoc,
+    serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 
@@ -24,7 +25,7 @@ type OwnerInfo = {
 };
 
 export default function SharingPage() {
-    const { homeId, user, loading: authLoading } = useAuth();
+    const { homeId, user, loading: authLoading, refreshHomeId } = useAuth();
 
     const [pageLoading, setPageLoading] = useState(true);
     const [isOwner, setIsOwner] = useState<boolean | null>(null);
@@ -53,7 +54,7 @@ export default function SharingPage() {
                 ownerId: user.uid,
                 ownerName: user.displayName ?? user.email ?? "",
                 ownerEmail: user.email ?? "",
-                createdAt: new Date(),
+                createdAt: serverTimestamp(),
             });
 
             await updateDoc(doc(db, "users", user.uid), {
@@ -63,15 +64,16 @@ export default function SharingPage() {
             // オーナー自身を members に追加
             await setDoc(doc(db, "homes", newHomeId, "members", user.uid), {
                 role: "owner",
-                joinedAt: new Date(),
+                joinedAt: serverTimestamp(),
                 name: user.displayName ?? "",
                 email: user.email ?? "",
             });
 
-            setInfoMessage("新しいおうちを作成しました。ページを再読み込みしてください。");
+            await refreshHomeId();
+            showInfo("新しいおうちを作成しました。");
         } catch (err) {
             console.error(err);
-            setErrorMessage("おうちの作成に失敗しました");
+            showError("おうちの作成に失敗しました");
         }
     };
 
@@ -160,7 +162,12 @@ export default function SharingPage() {
             }
 
             const targetDoc = snap.docs[0];
-            const data = targetDoc.data() as any;
+            const data = targetDoc.data() as {
+                uid?: string;
+                homeId?: string;
+                name?: string;
+                email?: string;
+            };
             const targetUid = data.uid ?? targetDoc.id;
 
             if (data.homeId === homeId) {
@@ -173,7 +180,7 @@ export default function SharingPage() {
 
             await setDoc(doc(db, "homes", homeId, "members", targetUid), {
                 role: "shared",
-                joinedAt: new Date(),
+                joinedAt: serverTimestamp(),
                 name: data.name ?? "",
                 email: data.email ?? "",
             });

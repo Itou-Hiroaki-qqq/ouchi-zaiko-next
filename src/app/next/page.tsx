@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useNextItems } from "../../hooks/useNextItems";
 import { useGenres } from "../../hooks/useGenres";
 import Link from "next/link";
 
 import { db } from "../../lib/firebase";
-import { doc, updateDoc, increment } from "firebase/firestore";
+import { doc, updateDoc, increment, serverTimestamp } from "firebase/firestore";
 import { AuthRequired } from "@/components/AuthRequired";
 
 export default function NextPage() {
@@ -16,8 +16,26 @@ export default function NextPage() {
     const { items, loading: nextLoading } = useNextItems(homeId);
 
     const [message, setMessage] = useState("");
-
     const [activeGenreId, setActiveGenreId] = useState<string | null>(null);
+
+    // purchaseCount > 0 の商品をジャンルごとにグループ化
+    const visibleGenres = useMemo(() => {
+        return genres
+            .map((g) => ({
+                ...g,
+                items: items.filter(
+                    (item) => item.genreId === g.id && (item.purchaseCount ?? 0) > 0
+                ),
+            }))
+            .filter((g) => g.items.length > 0);
+    }, [genres, items]);
+
+    // 初期タブ選択（renderではなくuseEffectで行う）
+    useEffect(() => {
+        if (!activeGenreId && visibleGenres.length > 0) {
+            setActiveGenreId(visibleGenres[0].id);
+        }
+    }, [activeGenreId, visibleGenres]);
 
     // ----------------------------
     // ▼ ローディング処理
@@ -27,7 +45,6 @@ export default function NextPage() {
         return <AuthRequired />;
     }
 
-    // ★★★ 修正：homeId が null の場合の UI
     if (!homeId) {
         return (
             <div className="p-4">
@@ -44,22 +61,6 @@ export default function NextPage() {
     }
 
     if (nextLoading) return <div className="p-4">読み込み中...</div>;
-
-    // purchaseCount > 0 の商品のみ
-    const grouped = genres.map((g) => ({
-        ...g,
-        items: items.filter(
-            (item) => item.genreId === g.id && (item.purchaseCount ?? 0) > 0
-        ),
-    }));
-
-    // アイテムのあるジャンルだけ表示
-    const visibleGenres = grouped.filter((g) => g.items.length > 0);
-
-    // 初期タブ設定
-    if (!activeGenreId && visibleGenres.length > 0) {
-        setActiveGenreId(visibleGenres[0].id);
-    }
 
     // 表示するジャンルがない
     if (visibleGenres.length === 0) {
@@ -82,7 +83,7 @@ export default function NextPage() {
         await updateDoc(ref, {
             quantity: increment(1),
             purchaseCount: 0,
-            updatedAt: new Date(),
+            updatedAt: serverTimestamp(),
         });
 
         setMessage("購入済みにしました");
@@ -99,7 +100,7 @@ export default function NextPage() {
 
         await updateDoc(ref, {
             purchaseCount: 0,
-            updatedAt: new Date(),
+            updatedAt: serverTimestamp(),
         });
 
         setMessage("購入リストから削除しました");

@@ -13,6 +13,7 @@ import {
   doc,
   updateDoc,
   deleteField,
+  serverTimestamp,
 } from "firebase/firestore";
 import { AuthRequired } from "@/components/AuthRequired";
 import { Item } from "../types/firestore";
@@ -22,6 +23,7 @@ export default function HomePage() {
 
   const [activeGenreId, setActiveGenreId] = useState<string | null>(null);
   const [newItem, setNewItem] = useState("");
+  const [isAddingItem, setIsAddingItem] = useState(false);
   const [sortedItems, setSortedItems] = useState<Item[]>([]);
   const prevGenreIdRef = useRef<string | null>(null);
   const prevItemLoadingRef = useRef(true);
@@ -131,21 +133,28 @@ export default function HomePage() {
   const handleAddItem = async () => {
     if (!homeId || !activeGenreId) return;
     if (!newItem.trim()) return;
+    if (isAddingItem) return;
 
-    await addDoc(collection(db, "homes", homeId, "items"), {
-      name: newItem.trim(),
-      genreId: activeGenreId,
-      quantity: 0,
-      memo: "",
-      note: "",
-      purchaseCount: 0,
-      totalPurchased: 0,
-      order: items.length,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    setNewItem("");
+    setIsAddingItem(true);
+    try {
+      await addDoc(collection(db, "homes", homeId, "items"), {
+        name: newItem.trim(),
+        genreId: activeGenreId,
+        quantity: 0,
+        memo: "",
+        purchaseCount: 0,
+        totalPurchased: 0,
+        order: items.length,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      setNewItem("");
+    } catch (e) {
+      console.error("商品追加エラー:", e);
+      alert("商品の追加に失敗しました。もう一度お試しください。");
+    } finally {
+      setIsAddingItem(false);
+    }
   };
 
   // ----------------------------
@@ -158,7 +167,7 @@ export default function HomePage() {
 
     await updateDoc(doc(db, "homes", homeId, "items", itemId), {
       quantity: safeQty,
-      updatedAt: new Date(),
+      updatedAt: serverTimestamp(),
     });
   };
 
@@ -174,6 +183,7 @@ export default function HomePage() {
   const handleQuantityInputChange = (itemId: string, value: string) => {
     const num = Number(value);
     if (Number.isNaN(num)) return;
+    if (!Number.isInteger(num)) return;
     if (num < 0) return;
     updateQuantity(itemId, num);
   };
@@ -206,7 +216,7 @@ export default function HomePage() {
     if (value === "" || value.trim() === "") {
       await updateDoc(doc(db, "homes", homeId, "items", itemId), {
         standardQuantity: deleteField(),
-        updatedAt: new Date(),
+        updatedAt: serverTimestamp(),
       });
       return;
     }
@@ -217,7 +227,7 @@ export default function HomePage() {
 
     await updateDoc(doc(db, "homes", homeId, "items", itemId), {
       standardQuantity: num,
-      updatedAt: new Date(),
+      updatedAt: serverTimestamp(),
     });
   };
 
@@ -231,7 +241,7 @@ export default function HomePage() {
 
     await updateDoc(doc(db, "homes", homeId, "items", itemId), {
       purchaseCount: nextCount,
-      updatedAt: new Date(),
+      updatedAt: serverTimestamp(),
     });
 
     alert("次回購入リストに追加しました");
@@ -303,8 +313,12 @@ export default function HomePage() {
           value={newItem}
           onChange={(e) => setNewItem(e.target.value)}
         />
-        <button className="btn btn-primary" onClick={handleAddItem}>
-          登録
+        <button
+          className="btn btn-primary"
+          onClick={handleAddItem}
+          disabled={isAddingItem}
+        >
+          {isAddingItem ? "登録中..." : "登録"}
         </button>
       </div>
 

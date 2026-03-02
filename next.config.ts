@@ -4,8 +4,9 @@ import withPWA from "next-pwa";
 const nextConfig: NextConfig = {
   reactStrictMode: true,
 
-  // ★ Next.js 16 で Turbopack を無効化する正式な方法
-  turbopack: {},
+  turbopack: {
+    root: __dirname,
+  },
 
   // webpack の設定をいじりたい場合はここで可能（なくてもOK）
   webpack(config) {

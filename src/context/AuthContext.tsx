@@ -11,7 +11,7 @@ import {
     User,
     signOut,
     setPersistence,
-    indexedDBLocalPersistence,   // ★★★ 追加：IndexedDB 永続化を使用
+    indexedDBLocalPersistence,
 } from "firebase/auth";
 import { auth, db } from "../lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
@@ -22,6 +22,7 @@ interface AuthContextType {
     loading: boolean;
     homeId: string | null;
     logout: () => Promise<void>;
+    refreshHomeId: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -29,6 +30,7 @@ const AuthContext = createContext<AuthContextType>({
     loading: true,
     homeId: null,
     logout: async () => {},
+    refreshHomeId: async () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -42,78 +44,82 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         await signOut(auth);
     };
 
-    // -------------------------------
-    // ★★★ ここが重要：永続化を IndexedDB に統一
-    // -------------------------------
+    // homeId を Firestore から再取得する（共有設定後などに使用）
+    const refreshHomeId = async () => {
+        const currentUser = auth.currentUser;
+        if (!currentUser) return;
+
+        const ref = doc(db, "users", currentUser.uid);
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+            setHomeId(snap.data().homeId ?? null);
+        }
+    };
+
     useEffect(() => {
+        let unsubscribeAuth: (() => void) | null = null;
+        let unsubscribeCookie: (() => void) | null = null;
+
+        // ① まず永続化をIndexedDBに設定し、完了後に各リスナーを登録
         setPersistence(auth, indexedDBLocalPersistence)
-            .then(() => console.log("Auth persistence set: IndexedDB"))
             .catch((err) =>
                 console.error("Failed to set Auth persistence:", err)
-            );
-    }, []);
+            )
+            .finally(() => {
+                // ② Cookie同期リスナー
+                unsubscribeCookie = setupAuthCookieListener();
 
-    // Auth Cookie Listener (必要なら保持)
-    useEffect(() => {
-        setupAuthCookieListener();
-    }, []);
-
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            console.log("AuthStateChanged triggered. currentUser =", currentUser?.uid);
-
-            // 未ログイン
-            if (!currentUser) {
-                setUser(null);
-                setHomeId(null);
-                setLoading(false);
-                return;
-            }
-
-            // ログインユーザーセット
-            setUser(currentUser);
-
-            try {
-                let userData = null;
-
-                // users/{uid} を最大5回リトライ
-                for (let i = 0; i < 5; i++) {
-                    console.log(`Trying to read users/${currentUser.uid}`);
-
-                    const ref = doc(db, "users", currentUser.uid);
-                    const snap = await getDoc(ref);
-
-                    if (snap.exists()) {
-                        console.log("users doc found:", snap.data());
-                        userData = snap.data();
-                        break;
-                    } else {
-                        console.log("users doc NOT found. retry...");
-                        await new Promise((res) => setTimeout(res, 120));
+                // ③ 認証状態リスナー
+                unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
+                    if (!currentUser) {
+                        setUser(null);
+                        setHomeId(null);
+                        setLoading(false);
+                        return;
                     }
-                }
 
-                if (!userData) {
-                    console.warn("ERROR: users/{uid} が取得できませんでした");
-                    setHomeId(null);
-                } else {
-                    console.log("Setting homeId:", userData.homeId);
-                    setHomeId(userData.homeId ?? null);
-                }
+                    setUser(currentUser);
 
-            } catch (e) {
-                console.error("AuthContext Firestore read ERROR:", e);
-            } finally {
-                setLoading(false);
-            }
-        });
+                    try {
+                        let userData = null;
 
-        return () => unsubscribe();
+                        // users/{uid} を最大5回リトライ（新規登録直後の遅延対策）
+                        for (let i = 0; i < 5; i++) {
+                            const ref = doc(db, "users", currentUser.uid);
+                            const snap = await getDoc(ref);
+
+                            if (snap.exists()) {
+                                userData = snap.data();
+                                break;
+                            } else {
+                                await new Promise((res) => setTimeout(res, 120));
+                            }
+                        }
+
+                        if (!userData) {
+                            console.warn("users/{uid} が取得できませんでした");
+                            setHomeId(null);
+                        } else {
+                            setHomeId(userData.homeId ?? null);
+                        }
+
+                    } catch (e) {
+                        console.error("AuthContext Firestore read ERROR:", e);
+                    } finally {
+                        setLoading(false);
+                    }
+                });
+            });
+
+        return () => {
+            unsubscribeAuth?.();
+            unsubscribeCookie?.();
+        };
     }, []);
 
     return (
         <AuthContext.Provider
-            value={{ user, loading, homeId, logout }}
+            value={{ user, loading, homeId, logout, refreshHomeId }}
         >
             {children}
         </AuthContext.Provider>

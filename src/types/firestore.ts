@@ -1,9 +1,11 @@
+import { Timestamp, FieldValue } from "firebase/firestore";
+
 // ジャンル
 export interface Genre {
     id: string;
     name: string;
     order: number;
-    createdAt: any; // Firestore Timestamp
+    createdAt: Timestamp | FieldValue;
 }
 
 // 商品
@@ -19,22 +21,19 @@ export interface Item {
     standardQuantity?: number;
 
     // メモ系フィールド
-    // 実際の Firestore では "memo" というフィールド名で保存しているので、
-    // それに合わせて memo を追加。過去の互換のため note も残しておく。
     memo?: string;
-    note?: string;
+    note?: string; // 過去の互換用
 
-    // 次回購入リスト用のカウント
-    // 0 より大きい場合、/next に表示される
+    // 次回購入リスト用のカウント（0より大きい場合、/nextに表示）
     purchaseCount?: number;
 
-    // 将来の「累計購入数」用として残しているフィールド（未使用なら 0 扱いでもOK）
+    // 累計購入数（将来用）
     totalPurchased?: number;
 
     // 並び順
     order: number;
 
     // 作成日時・更新日時
-    createdAt: any; // Firestore Timestamp
-    updatedAt?: any; // Firestore Timestamp
+    createdAt: Timestamp | FieldValue;
+    updatedAt?: Timestamp | FieldValue;
 }

@@ -6,7 +6,7 @@ import { useAuth } from "../../../context/AuthContext";
 import { useItem } from "../../../hooks/useItem";
 
 import { db } from "../../../lib/firebase";
-import { doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { doc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
 import Link from "next/link";
 import { AuthRequired } from "@/components/AuthRequired";
 
@@ -21,6 +21,8 @@ export default function ItemDetailPage() {
     // 商品名も編集できるようにする
     const [name, setName] = useState("");
     const [memo, setMemo] = useState("");
+    const [isSaving, setIsSaving] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         if (item) {
@@ -70,21 +72,37 @@ export default function ItemDetailPage() {
     // ▼ Firestore 更新処理（商品名 + memo）
     // ---------------------------
     const handleSave = async () => {
-        await updateDoc(doc(db, "homes", homeId, "items", itemId), {
-            name: name.trim(),
-            memo,
-            updatedAt: new Date(),
-        });
-
-        alert("商品情報を保存しました");
+        if (isSaving) return;
+        setIsSaving(true);
+        try {
+            await updateDoc(doc(db, "homes", homeId, "items", itemId), {
+                name: name.trim(),
+                memo,
+                updatedAt: serverTimestamp(),
+            });
+            alert("商品情報を保存しました");
+        } catch (e) {
+            console.error("商品保存エラー:", e);
+            alert("保存に失敗しました。もう一度お試しください。");
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const handleDelete = async () => {
         if (!confirm("本当にこの商品を完全に削除しますか？この操作は取り消せません")) return;
+        if (isDeleting) return;
 
-        await deleteDoc(doc(db, "homes", homeId, "items", itemId));
-        alert("削除しました");
-        router.push("/");
+        setIsDeleting(true);
+        try {
+            await deleteDoc(doc(db, "homes", homeId, "items", itemId));
+            alert("削除しました");
+            router.push("/");
+        } catch (e) {
+            console.error("商品削除エラー:", e);
+            alert("削除に失敗しました。もう一度お試しください。");
+            setIsDeleting(false);
+        }
     };
 
     // ---------------------------
@@ -119,14 +137,20 @@ export default function ItemDetailPage() {
                 />
             </div>
 
-            {/* 保存ボタン（作成 → 保存 に変更） */}
-            <button className="btn btn-primary block" onClick={handleSave}>
-                保存
+            <button
+                className="btn btn-primary block"
+                onClick={handleSave}
+                disabled={isSaving || isDeleting}
+            >
+                {isSaving ? "保存中..." : "保存"}
             </button>
 
-            {/* 削除ボタン（色を btn-warning に変更） */}
-            <button className="btn btn-warning text-base-100" onClick={handleDelete}>
-                この商品を完全に削除する
+            <button
+                className="btn btn-warning text-base-100"
+                onClick={handleDelete}
+                disabled={isSaving || isDeleting}
+            >
+                {isDeleting ? "削除中..." : "この商品を完全に削除する"}
             </button>
 
             <Link href="/" className="text-blue-600 underline block pt-4">

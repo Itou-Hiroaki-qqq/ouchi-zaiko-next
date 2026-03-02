@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useGenres } from "../../hooks/useGenres";
 import { db } from "../../lib/firebase";
-import { collection, addDoc, deleteDoc, doc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, deleteDoc, doc, getDocs, query, where, serverTimestamp } from "firebase/firestore";
 import Link from "next/link";
 import { AuthRequired } from "../../components/AuthRequired";
 
@@ -14,6 +14,8 @@ export default function GenresPage() {
 
     const [newGenre, setNewGenre] = useState("");
     const [message, setMessage] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
 
     // ----------------------------
     // ▼ ローディング
@@ -44,31 +46,58 @@ export default function GenresPage() {
     // ----------------------------
     const handleAdd = async () => {
         if (!newGenre.trim()) return;
+        if (isSubmitting) return;
 
-        await addDoc(collection(db, "homes", homeId, "genres"), {
-            name: newGenre.trim(),
-            order: genres.length,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-        });
-
-        setNewGenre("");
-
-        setMessage("ジャンルを追加しました");
-        setTimeout(() => setMessage(""), 5000);
+        setIsSubmitting(true);
+        try {
+            await addDoc(collection(db, "homes", homeId, "genres"), {
+                name: newGenre.trim(),
+                order: genres.length,
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+            });
+            setNewGenre("");
+            setMessage("ジャンルを追加しました");
+            setTimeout(() => setMessage(""), 5000);
+        } catch (e) {
+            console.error("ジャンル追加エラー:", e);
+            setMessage("追加に失敗しました");
+            setTimeout(() => setMessage(""), 5000);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     // ----------------------------
-    // ▼ ジャンル削除
+    // ▼ ジャンル削除（紐づくアイテムも削除）
     // ----------------------------
     const handleDelete = async (id: string) => {
-        const ok = confirm("削除してよろしいですか？");
+        const ok = confirm("削除してよろしいですか？\nこのジャンルに属する商品もすべて削除されます。");
         if (!ok) return;
+        if (deletingId) return;
 
-        await deleteDoc(doc(db, "homes", homeId, "genres", id));
+        setDeletingId(id);
+        try {
+            // ① 紐づくアイテムを全て削除
+            const itemsQuery = query(
+                collection(db, "homes", homeId, "items"),
+                where("genreId", "==", id)
+            );
+            const itemsSnapshot = await getDocs(itemsQuery);
+            await Promise.all(itemsSnapshot.docs.map((d) => deleteDoc(d.ref)));
 
-        setMessage("ジャンルを削除しました");
-        setTimeout(() => setMessage(""), 5000);
+            // ② ジャンル自体を削除
+            await deleteDoc(doc(db, "homes", homeId, "genres", id));
+
+            setMessage("ジャンルと関連する商品を削除しました");
+            setTimeout(() => setMessage(""), 5000);
+        } catch (e) {
+            console.error("ジャンル削除エラー:", e);
+            setMessage("削除に失敗しました");
+            setTimeout(() => setMessage(""), 5000);
+        } finally {
+            setDeletingId(null);
+        }
     };
 
     // ----------------------------
@@ -89,8 +118,12 @@ export default function GenresPage() {
                     value={newGenre}
                     onChange={(e) => setNewGenre(e.target.value)}
                 />
-                <button className="btn btn-primary" onClick={handleAdd}>
-                    追加
+                <button
+                    className="btn btn-primary"
+                    onClick={handleAdd}
+                    disabled={isSubmitting}
+                >
+                    {isSubmitting ? "追加中..." : "追加"}
                 </button>
             </div>
 
@@ -119,8 +152,9 @@ export default function GenresPage() {
                                 <button
                                     className="btn btn-sm btn-outline btn-error"
                                     onClick={() => handleDelete(genre.id)}
+                                    disabled={deletingId === genre.id}
                                 >
-                                    削除
+                                    {deletingId === genre.id ? "削除中..." : "削除"}
                                 </button>
                             </div>
                         </li>

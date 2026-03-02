@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { auth, db } from "../../lib/firebase";
-import { doc, setDoc, collection, addDoc, getDoc } from "firebase/firestore";
+import { doc, setDoc, collection, addDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 
 export default function RegisterPage() {
@@ -48,9 +48,9 @@ export default function RegisterPage() {
             // ============================
             const homeRef = await addDoc(collection(db, "homes"), {
                 ownerId: uid,
-                ownerName: name,     // ★追加
-                ownerEmail: email,   // ★追加
-                createdAt: new Date(),
+                ownerName: name,
+                ownerEmail: email,
+                createdAt: serverTimestamp(),
             });
 
             const homeId = homeRef.id;
@@ -66,7 +66,7 @@ export default function RegisterPage() {
             // ============================
             await setDoc(doc(db, "homes", homeId, "members", uid), {
                 role: "owner",
-                joinedAt: new Date(),
+                joinedAt: serverTimestamp(),
             });
 
             // ============================
@@ -77,22 +77,16 @@ export default function RegisterPage() {
                 name,
                 email,
                 homeId,
-                createdAt: new Date(),
+                createdAt: serverTimestamp(),
             });
-
-            // ============================
-            // ⑤ AuthContext 更新待ち
-            // ============================
-            await auth.updateCurrentUser(userCredential.user);
-            await new Promise((resolve) => setTimeout(resolve, 300));
 
             router.push("/");
 
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error(err);
 
             const msg =
-                typeof err?.message === "string"
+                err instanceof Error
                     ? err.message.replace("Firebase:", "").trim()
                     : "不明なエラー";
 
