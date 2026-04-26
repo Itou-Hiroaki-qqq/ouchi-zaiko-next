@@ -18,6 +18,53 @@ import {
 import { AuthRequired } from "@/components/AuthRequired";
 import { Item } from "../types/firestore";
 
+// ----------------------------
+// ▼ 在庫リスト用ソート比較関数
+// ----------------------------
+// 優先順位:
+//   ① 定数割れグループ（standardQuantity > 0 かつ quantity < standardQuantity）が最上段
+//   ② 定数割れグループ内では「定数 − 数量」の差が大きい順
+//   ③ それ以外は数量昇順 → 過去購入数降順 → 登録順
+const compareItems = (a: Item, b: Item): number => {
+  const qtyA = a.quantity ?? 0;
+  const qtyB = b.quantity ?? 0;
+  const stdA = a.standardQuantity ?? 0;
+  const stdB = b.standardQuantity ?? 0;
+
+  // standardQuantity が 0 / 未設定 の場合は「定数なし」扱い
+  const isBelowStdA = stdA > 0 && qtyA < stdA;
+  const isBelowStdB = stdB > 0 && qtyB < stdB;
+
+  // ① 定数割れグループを最上段へ
+  if (isBelowStdA && !isBelowStdB) return -1;
+  if (!isBelowStdA && isBelowStdB) return 1;
+
+  // ② 両方とも定数割れの場合は差が大きい順
+  if (isBelowStdA && isBelowStdB) {
+    const gapA = stdA - qtyA;
+    const gapB = stdB - qtyB;
+    if (gapA !== gapB) {
+      return gapB - gapA;
+    }
+    // 差が同じ場合は以下の既存ルールへフォールスルー
+  }
+
+  // ③ 数量が少ないものほど上
+  if (qtyA !== qtyB) {
+    return qtyA - qtyB;
+  }
+
+  // ④ 過去の購入数が多いもの
+  const totalA = a.totalPurchased ?? 0;
+  const totalB = b.totalPurchased ?? 0;
+  if (totalA !== totalB) {
+    return totalB - totalA;
+  }
+
+  // ⑤ 登録順
+  return (a.order ?? 0) - (b.order ?? 0);
+};
+
 export default function HomePage() {
   const { homeId, loading: authLoading, user } = useAuth();
 
@@ -62,19 +109,7 @@ export default function HomePage() {
           
           if (hasNewItems || hasRemovedItems) {
             // 商品の追加・削除があった場合は並び替えを適用
-            const sorted = [...items].sort((a, b) => {
-              const qtyA = a.quantity ?? 0;
-              const qtyB = b.quantity ?? 0;
-              if (qtyA !== qtyB) {
-                return qtyA - qtyB;
-              }
-              const totalA = a.totalPurchased ?? 0;
-              const totalB = b.totalPurchased ?? 0;
-              if (totalA !== totalB) {
-                return totalB - totalA;
-              }
-              return (a.order ?? 0) - (b.order ?? 0);
-            });
+            const sorted = [...items].sort(compareItems);
             return sorted;
           }
           
@@ -104,25 +139,7 @@ export default function HomePage() {
       return;
     }
 
-    const sorted = [...items].sort((a, b) => {
-      const qtyA = a.quantity ?? 0;
-      const qtyB = b.quantity ?? 0;
-
-      // ① 数量が少ないものほど上
-      if (qtyA !== qtyB) {
-        return qtyA - qtyB;
-      }
-
-      // ② 過去の購入数が多いもの
-      const totalA = a.totalPurchased ?? 0;
-      const totalB = b.totalPurchased ?? 0;
-      if (totalA !== totalB) {
-        return totalB - totalA;
-      }
-
-      // ③ 登録順
-      return (a.order ?? 0) - (b.order ?? 0);
-    });
+    const sorted = [...items].sort(compareItems);
 
     setSortedItems(sorted);
   }, [activeGenreId, itemLoading, items]);
